@@ -67,7 +67,8 @@ Batch API for ranking extracted patterns using multi-objective scoring (effectiv
 ```
 
 **Request Schema**:
-```
+
+```text
 POST /rank HTTP/1.1
 Content-Type: application/json
 Authorization: Bearer <token> OR X-API-Key: <key>
@@ -210,12 +211,13 @@ Authorization: Bearer <token> OR X-API-Key: <key>
 
 #### Request
 
-```
+```text
 GET /rank/pat_001/scores?days=30&limit=100 HTTP/1.1
 Authorization: Bearer <token>
 ```
 
 **Query Parameters**:
+
 - `days`: Int (optional, default 30) - How many days of history
 - `limit`: Int (optional, default 100, max 1000) - Max snapshots
 - `include_trend`: Boolean (optional, default true) - Include trend analysis
@@ -263,12 +265,13 @@ Authorization: Bearer <token>
 
 #### Request
 
-```
+```text
 GET /rank/dashboard?domain=ml HTTP/1.1
 Authorization: Bearer <token>
 ```
 
 **Query Parameters**:
+
 - `domain`: String (optional) - Filter by domain
 - `fsm_type`: String (optional) - Filter by FSM type
 
@@ -352,20 +355,24 @@ Authorization: Bearer <token>
 ### Inputs (Dependencies)
 
 **Phase 2.1 (Danger Classifier)**
+
 - Consumes: DangerScore objects
 - Contract: Provides safety_level mapping
 
 **Phase 2.2 (FSM Router)**
+
 - Consumes: FSMClassification
 - Contract: Provides current_fsm_type for relevance scoring
 
 **Phase 3.1 (Pattern Extraction)**
+
 - Consumes: Pattern metadata (FSM types, domains)
 - Contract: Expects patterns in Neo4j with indexed scores
 
 ### Outputs (Consumers)
 
 **Phase 3.3 (Optimization Loop)**
+
 - Provides: RankedPattern scores + history
 - Contract: Re-ranking triggers when feedback arrives
 
@@ -419,4 +426,3 @@ curl https://api.grimoire.local/v1/rank/dashboard \
 ```
 
 **Response**: 387 total patterns, average rank 0.71, 320 SAFE, 2 CRITICAL (flagged for review)
-

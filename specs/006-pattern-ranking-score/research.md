@@ -18,23 +18,27 @@ Multi-objective optimization: can't maximize all simultaneously.
 ### Option A: Weighted Sum (Recommended for MVP)
 
 **Formula**:
-```
+
+```text
 final_rank = w1 × effectiveness + w2 × safety + w3 × relevance + w4 × cost
 where w1 + w2 + w3 + w4 = 1.0
 ```
 
 **Default Weights**:
+
 - `w1` = 0.4 (effectiveness is most important)
 - `w2` = 0.3 (safety is critical but less flexible)
 - `w3` = 0.2 (relevance helps but not essential)
 - `w4` = 0.1 (efficiency is nice-to-have)
 
 **Pros**:
+
 - Simple, deterministic, explainable
 - Fast computation (single pass)
 - Easy to tune weights (interpretable)
 
 **Cons**:
+
 - Weights are arbitrary (requires domain expertise)
 - Linear model misses non-linear trade-offs
 - Doesn't handle conflicting objectives well
@@ -48,6 +52,7 @@ where w1 + w2 + w3 + w4 = 1.0
 **Approach**: Find patterns where no other pattern dominates on all objectives
 
 **Definition**: Pattern A dominates B if:
+
 - `effectiveness(A) ≥ effectiveness(B)` AND
 - `safety(A) ≥ safety(B)` AND
 - `relevance(A) ≥ relevance(B)` AND
@@ -56,6 +61,7 @@ where w1 + w2 + w3 + w4 = 1.0
 AND at least one is strictly greater.
 
 **Algorithm**:
+
 ```python
 pareto_frontier = []
 for pattern in patterns:
@@ -72,11 +78,13 @@ return sorted(pareto_frontier, key=lambda p: p.effectiveness, reverse=True)
 ```
 
 **Pros**:
+
 - No arbitrary weights
 - Optimal (no better solution exists)
 - Handles conflicting objectives naturally
 
 **Cons**:
+
 - Frontier may be large (100+ patterns)
 - Still need tie-breaking rule (within frontier)
 - More complex to implement + explain
@@ -90,19 +98,23 @@ return sorted(pareto_frontier, key=lambda p: p.effectiveness, reverse=True)
 **Approach**: Train regression model to predict "goodness" score
 
 **Data**:
+
 - Features: `[effectiveness, safety, relevance, cost, domain_match, user_context]`
 - Label: `human_rating` (1-5) or `observed_outcome_quality`
 
-**Algorithm**: 
+**Algorithm**:
+
 - LambdaMART or LightGBM with ranking objective
 - Learn patterns in feature interactions (non-linear)
 
 **Pros**:
+
 - Automatic weight learning
 - Captures non-linear interactions
 - Empirically validated
 
 **Cons**:
+
 - Requires labeled training data
 - Black box (hard to explain ranking)
 - Requires retraining as data changes
@@ -114,12 +126,14 @@ return sorted(pareto_frontier, key=lambda p: p.effectiveness, reverse=True)
 ## Effectiveness Scoring
 
 **Components**:
+
 1. Success rate: Proportion of executions that succeeded
 2. Outcome quality: User-rated outcome (1-10)
 3. User satisfaction: Subjective feedback (1-5)
 
 **Formula**:
-```
+
+```text
 effectiveness = 
   0.4 × min(success_count / min_samples, 1.0) +
   0.35 × (avg_quality / 10) +
@@ -127,19 +141,22 @@ effectiveness =
 ```
 
 **Edge Cases**:
+
 - If `success_count < min_samples` (default 5): Assign default score 0.5 (unknown)
 - If no feedback: default 0.5
 - If all failures: score = 0
 - If 100% success + quality 10 + satisfaction 5: score = 1.0
 
 **Time Decay** (optional):
-```
+
+```text
 # Weight recent feedback higher
 weight = exp(-age_days / 30)  # Decays to 0.37 after 30 days
 effectiveness_updated = weighted_average(effectiveness, new_feedback, weight)
 ```
 
 **Validation**:
+
 - Range: 0-1 ✓
 - Deterministic (same input → same output) ✓
 - Explainable (transparent formula) ✓
@@ -151,6 +168,7 @@ effectiveness_updated = weighted_average(effectiveness, new_feedback, weight)
 **Integration with Phase 2.1 (Danger Classifier)**
 
 **Danger Types Mapping**:
+
 | Danger Type | Safety Score | Recommendation |
 |-------------|--------------|-----------------|
 | CRITICAL | 0 | ❌ Never recommend, escalate |
@@ -160,6 +178,7 @@ effectiveness_updated = weighted_average(effectiveness, new_feedback, weight)
 | SAFE (no danger) | 1.0 | ✓ Recommend freely |
 
 **Logic**:
+
 ```python
 def safety_score(pattern, danger_scores):
     # Take worst (minimum) danger type
@@ -176,6 +195,7 @@ def safety_score(pattern, danger_scores):
 ```
 
 **Escalation**:
+
 - CRITICAL patterns: logged, operator alert, blocked from auto-execution
 - HIGH patterns: logged, available but flagged in UI
 - MEDIUM patterns: logged, recommended with warning
@@ -190,23 +210,27 @@ def safety_score(pattern, danger_scores):
 **Concept**: How well does pattern match current execution context?
 
 **Formula**:
-```
+
+```text
 relevance = pattern_fsm_types ∩ current_fsm_types / |current_fsm_types|
 ```
 
 Example:
+
 - Pattern applies to: `[DECISION, ITERATION]` (2 types)
 - Current FSM type: `[DECISION, CONDITIONAL, BRANCHING]` (3 types)
 - Overlap: `[DECISION]` (1 type)
 - Relevance: 1 / 3 = 0.33
 
 **Edge Cases**:
+
 - No current FSM context: relevance = 1.0 (always relevant)
 - Pattern not tagged with FSM: relevance = 1.0 (assume universal)
 - Exact FSM match: relevance = 1.0 (perfect)
 
 **Domain Matching** (secondary):
-```
+
+```text
 domain_relevance = pattern_domains ∩ current_domains / |pattern_domains|
 # Add to ranking if domain provided
 adjusted_relevance = 0.7 × fsm_relevance + 0.3 × domain_relevance
@@ -217,12 +241,14 @@ adjusted_relevance = 0.7 × fsm_relevance + 0.3 × domain_relevance
 ## Cost Scoring
 
 **Components**:
+
 - Latency: Execution time (ms)
 - Memory: Peak memory (MB)
 - Error rate: Failure rate (0-1)
 
 **Normalization**:
-```
+
+```text
 normalized_latency = min(latency_ms / 1000, 1.0)     # 1000ms = score 1.0
 normalized_memory = min(memory_mb / 100, 1.0)        # 100MB = score 1.0
 normalized_error = error_rate                         # 0-1 already
@@ -236,6 +262,7 @@ cost_score = 1 / (1 + cost_metric)  # Inverse sigmoid [0, 1)
 ```
 
 **Example**:
+
 - Pattern A: 50ms, 10MB, 1% error
   - Metrics: (0.05, 0.1, 0.01)
   - cost_metric = 0.5×0.05 + 0.3×0.1 + 0.2×0.01 = 0.052
@@ -251,7 +278,8 @@ cost_score = 1 / (1 + cost_metric)  # Inverse sigmoid [0, 1)
 ## Multi-Objective Formula
 
 **Final Ranking**:
-```
+
+```text
 rank_score = 
   0.4 × effectiveness_score +
   0.3 × safety_score +
@@ -260,6 +288,7 @@ rank_score =
 ```
 
 **All components normalized to [0, 1]**:
+
 - effectiveness_score: 0-1 ✓
 - safety_score: 0-1 ✓
 - relevance_score: 0-1 ✓
@@ -274,20 +303,24 @@ rank_score =
 ### Dependency Resolution
 
 **Scenario 1: DangerScore available**
+
 - Use Phase 2.1 output directly: `safety_score = map_danger_to_safety(danger_scores)`
 - If unavailable, gracefully degrade: `safety_score = 1.0`
 
 **Scenario 2: FSMClassification available**
+
 - Use Phase 2.2 output directly: `relevance_score = jaccard(pattern_fsm, current_fsm)`
 - If unavailable, degrade: `relevance_score = 1.0`
 
 **No Circular Dependency**:
+
 - Ranking doesn't call back to Phase 2 (one-way dependency)
 - Phase 2 can evolve independently
 
 ### Contract Inputs
 
 From Phase 2.1:
+
 ```python
 DangerScore(
     pattern_id: str,
@@ -298,6 +331,7 @@ DangerScore(
 ```
 
 From Phase 2.2:
+
 ```python
 FSMClassification(
     trace_id: str,
@@ -345,10 +379,12 @@ FSMClassification(
 ### A/B Testing Ranking Formulas
 
 **Setup**: Compare two ranking formulas
+
 - Formula A (current): 0.4/0.3/0.2/0.1 weights
 - Formula B (proposed): 0.5/0.2/0.2/0.1 weights
 
 **Metrics**:
+
 - User satisfaction: avg rating of recommended patterns
 - Adoption: % of recommendations actually used
 - Success rate: outcome quality when pattern used
@@ -365,4 +401,3 @@ FSMClassification(
 | Expensive Neo4j queries for 1M | Medium | Index + pre-compute + batch ops |
 | Circular dependencies (rank→danger) | Low | One-way dependency, graceful degrade |
 | Non-normalized scores | High | Validate all inputs [0, 1] |
-

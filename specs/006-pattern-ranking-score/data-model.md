@@ -24,18 +24,18 @@ class SafetyLevel(str, Enum):
 
 class RankedPattern(BaseModel):
     """Pattern with all ranking scores and final rank."""
-    
+
     pattern_id: str = Field(
         description="Pattern being ranked (from Phase 3.1)"
     )
-    
+
     # Component scores (all 0-1 range)
     effectiveness_score: float = Field(
         ge=0, le=1.0,
         description="How well does pattern work? "
         "(success_rate + quality + satisfaction weighted)"
     )
-    
+
     safety_score: float = Field(
         ge=0, le=1.0,
         description="How safe is pattern? "
@@ -44,31 +44,31 @@ class RankedPattern(BaseModel):
     safety_level: SafetyLevel = Field(
         description="Danger classification: CRITICAL→0, HIGH→0.25, etc."
     )
-    
+
     relevance_score: float = Field(
         ge=0, le=1.0,
         description="How relevant to current context? "
         "(FSM type match from Phase 2.2)"
     )
-    
+
     cost_score: float = Field(
         ge=0, le=1.0,
         description="How efficient is pattern? "
         "(1/(1 + cost_metric) where cost is latency + memory + error)"
     )
-    
+
     # Final ranking
     final_rank_score: float = Field(
         ge=0, le=1.0,
         description="Weighted sum: 0.4×eff + 0.3×safe + 0.2×rel + 0.1×cost"
     )
-    
+
     # Explanations (for debugging + UI)
     score_breakdown: dict = Field(
         description="Detailed breakdown: "
         "{'effectiveness': {...}, 'safety': {...}, ...}"
     )
-    
+
     # Context
     fsm_type: Optional[str] = Field(
         default=None,
@@ -78,7 +78,7 @@ class RankedPattern(BaseModel):
         default=None,
         description="Current domain (ML, finance, etc.), optional"
     )
-    
+
     # Metadata
     ranked_at: str = Field(
         description="ISO8601 timestamp when ranking was computed"
@@ -87,7 +87,7 @@ class RankedPattern(BaseModel):
         ge=1,
         description="Ranking algorithm version (for tracking changes)"
     )
-    
+
     class Config:
         use_enum_values = False
 ```
@@ -99,23 +99,23 @@ class RankedPattern(BaseModel):
 ```python
 class RankingContext(BaseModel):
     """Input context for ranking operation."""
-    
+
     current_fsm_type: Optional[str] = Field(
         default=None,
         description="Current FSM state (e.g., DECISION, ITERATION)"
     )
-    
+
     current_domain: Optional[str] = Field(
         default=None,
         description="Current problem domain (ml, finance, etc.)"
     )
-    
+
     danger_scores: Optional[List['DangerScore']] = Field(
         default=None,
         description="Pre-computed danger scores from Phase 2.1. "
         "If missing, assume all SAFE."
     )
-    
+
     execution_context: Optional[dict] = Field(
         default=None,
         description="Additional context (user_id, request_id, etc.)"
@@ -129,7 +129,7 @@ class RankingContext(BaseModel):
 ```python
 class DangerScore(BaseModel):
     """Danger classification output from Phase 2.1."""
-    
+
     pattern_id: str
     danger_types: List[str] = Field(
         description="Detected danger types: CRITICAL, HIGH, MEDIUM, LOW"
@@ -151,19 +151,19 @@ class DangerScore(BaseModel):
 ```python
 class RankingOutput(BaseModel):
     """API response from ranking operation."""
-    
+
     ranking_id: str = Field(
         default_factory=lambda: f"rank_{uuid.uuid4().hex[:12]}"
     )
-    
+
     ranked_patterns: List[RankedPattern] = Field(
         description="Patterns sorted by final_rank_score (desc)"
     )
-    
+
     context_used: RankingContext = Field(
         description="Context that was applied"
     )
-    
+
     # Stats
     num_ranked: int = Field(ge=0)
     num_critical: int = Field(
@@ -174,12 +174,12 @@ class RankingOutput(BaseModel):
         ge=0,
         description="Patterns with SAFE danger level"
     )
-    
+
     avg_rank_score: float = Field(
         ge=0, le=1.0,
         description="Average final_rank_score"
     )
-    
+
     # Performance
     ranking_duration_ms: float = Field(ge=0)
     ranked_at: str = Field(description="ISO8601")
@@ -202,12 +202,12 @@ class RankingSnapshot(BaseModel):
 
 class RankingHistory(BaseModel):
     """Historical tracking of pattern rankings over time."""
-    
+
     pattern_id: str
     snapshots: List[RankingSnapshot] = Field(
         description="Time-ordered ranking snapshots"
     )
-    
+
     # Trend analysis
     avg_rank_score_7d: Optional[float] = Field(
         default=None,
@@ -217,7 +217,7 @@ class RankingHistory(BaseModel):
         default=None,
         description="IMPROVING, STABLE, DEGRADING"
     )
-    
+
     last_updated: str = Field(description="ISO8601")
 ```
 
@@ -230,21 +230,21 @@ class RankingHistory(BaseModel):
 ```python
 class BatchRankRequest(BaseModel):
     """API request for batch ranking."""
-    
+
     pattern_ids: List[str] = Field(
         min_items=1, max_items=1000000,
         description="Patterns to rank"
     )
-    
+
     context: RankingContext = Field(
         description="Ranking context (FSM type, domain, danger scores)"
     )
-    
+
     include_metadata: bool = Field(
         default=True,
         description="Include score_breakdown (verbose)"
     )
-    
+
     limit_top_k: Optional[int] = Field(
         default=None,
         description="Return only top-K patterns (for performance)"
@@ -256,14 +256,14 @@ class BatchRankRequest(BaseModel):
 ```python
 class BatchRankResponse(BaseModel):
     """API response from batch ranking."""
-    
+
     ranking_id: str
     ranked_patterns: List[RankedPattern]
-    
+
     stats: dict = Field(
         description="Aggregated stats (num_critical, avg_score, etc.)"
     )
-    
+
     ranking_duration_ms: float
     ranked_at: str
 ```
@@ -433,4 +433,3 @@ CREATE INDEX ranked_safety ON RankedPattern(safety_level)
   "ranked_at": "2026-02-12T15:30:00Z"
 }
 ```
-

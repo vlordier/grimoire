@@ -5,6 +5,7 @@
 Given a corpus of execution traces (10K-1M traces), how do we efficiently extract reusable reasoning patterns (subgraphs) that appear frequently?
 
 **Key Challenges**:
+
 1. Subgraph isomorphism is NP-complete (exponential in worst case)
 2. Similar patterns may have slight variations (fuzzy matching)
 3. Real traces are large (100+ steps), creating combinatorial explosion
@@ -15,14 +16,17 @@ Given a corpus of execution traces (10K-1M traces), how do we efficiently extrac
 ## Subgraph Matching Approaches
 
 ### Option A: Exact Isomorphism (Reference)
+
 **Algorithm**: VF2 algorithm (state-of-the-art for exact matching)
 
 **Pros**:
+
 - Guaranteed correctness
 - Well-implemented in libraries (igraph, networkx)
 - Deterministic results
 
 **Cons**:
+
 - O(n! × m!) worst case for n nodes, m edges
 - Infeasible for traces >50 nodes
 - Misses similar patterns (requires exact structure match)
@@ -32,15 +36,18 @@ Given a corpus of execution traces (10K-1M traces), how do we efficiently extrac
 ---
 
 ### Option B: Frequent Subgraph Mining (Recommended for MVP)
+
 **Algorithm**: gSpan (Graph-based Subsequence Pattern Mining)
 
 **How It Works**:
+
 1. Enumerate all connected subgraphs from traces
 2. Track frequency of each unique subgraph
 3. Return subgraphs appearing ≥min_frequency times
 4. Prune infrequent patterns early (apriori principle)
 
 **Implementation**:
+
 ```python
 # Pseudocode
 patterns = {}
@@ -53,21 +60,25 @@ result = [sg for sg, count in patterns.items() if count >= min_frequency]
 ```
 
 **Parameters**:
+
 - `min_frequency`: Min traces containing pattern (default: 5, 0.1% of corpus)
 - `max_size`: Max nodes in pattern (default: 10, balance coverage vs. complexity)
 - `min_nodes`: Min nodes to be considered pattern (default: 2)
 
 **Complexity**:
+
 - Time: O(traces × patterns × enumeration_time)
 - Space: O(unique_patterns)
 - Practical: ~1-5 sec per 1K traces (with pruning)
 
 **Pros**:
+
 - Efficient (pruning eliminates exponential explosion)
 - Discovers frequent patterns automatically
 - Well-researched algorithm (30+ years)
 
 **Cons**:
+
 - Requires parameter tuning (min_frequency)
 - May miss rare-but-valuable patterns
 - Canonical form expensive (graph hashing)
@@ -77,19 +88,23 @@ result = [sg for sg, count in patterns.items() if count >= min_frequency]
 ---
 
 ### Option C: Neural Graph Embedding (Future)
+
 **Algorithm**: GCN (Graph Convolutional Network) or GraphSAINT
 
 **How It Works**:
+
 1. Train embeddings on trace graphs
 2. Cluster embeddings (similar patterns close in embedding space)
 3. Extract cluster representatives as patterns
 
 **Pros**:
+
 - Discovers semantic similarity (even if structure differs)
 - Learns from execution outcomes (supervised)
 - More powerful than structure-only matching
 
 **Cons**:
+
 - Requires training data + labels
 - Black box (harder to validate)
 - Slower inference (neural network)
@@ -101,12 +116,15 @@ result = [sg for sg, count in patterns.items() if count >= min_frequency]
 ## Deduplication Strategy
 
 ### Problem: Similar Pattern Detection
+
 After mining, `{IFTHEN-A, IFTHEN-B, IFTHEN-C}` three patterns might be semantically identical but structurally differ due to variable naming, order variations, etc.
 
 ### Option 1: Exact Canonicalization
+
 **Approach**: Normalize graph structure → unique canonical form
 
 **Steps**:
+
 1. Node relabeling: sort nodes by degree + adjacency
 2. Edge ordering: normalize edge lists
 3. Hash canonical form → unique pattern ID
@@ -120,14 +138,17 @@ After mining, `{IFTHEN-A, IFTHEN-B, IFTHEN-C}` three patterns might be semantica
 ---
 
 ### Option 2: Fuzzy Matching (Recommended)
+
 **Approach**: Use graph similarity metrics to cluster similar patterns
 
 **Metric 1: Graph Edit Distance (GED)**
+
 - Minimum edits (add/remove/relabel node/edge) to transform G1 → G2
 - Normalized by graph size: similarity = 1 - (GED / max_cost)
 - Threshold: patterns with similarity > 0.9 → same cluster
 
 **Implementation**:
+
 ```python
 def graph_similarity(g1, g2):
     ged = compute_ged(g1, g2)  # Use Hungarian algorithm
@@ -142,19 +163,23 @@ for i, p1 in enumerate(patterns):
 ```
 
 **Complexity**: O(n² × GED_computation)  
+
 - GED: Hungarian algorithm O(n³)
 - Practical: ~100ms for 1K patterns
 
 **Metric 2: Jaccard Similarity** (Faster)
+
 - `sim = common_edges / union_edges`
 - Threshold: sim > 0.8 → same cluster
 - O(n × m) instead of O(n³), but less accurate
 
 **Metric 3: Subgraph Matching**
+
 - For each pattern pair, count max common subgraph size
 - `similarity = 2 × common_size / (size_p1 + size_p2)`
 
 **Recommendation**: Use Jaccard (fast) + GED (accurate) hybrid
+
 - First pass: Jaccard for quick filtering (threshold 0.8)
 - Second pass: GED on candidates (threshold 0.9)
 
@@ -167,6 +192,7 @@ for i, p1 in enumerate(patterns):
 ### What to Measure
 
 **Per Pattern**:
+
 1. `latency_ms`: Avg execution time on matching traces
 2. `latency_p95`: 95th percentile latency
 3. `memory_peak_mb`: Max memory during execution
@@ -174,6 +200,7 @@ for i, p1 in enumerate(patterns):
 5. `error_types`: Categorized errors (timeout, overflow, invalid_state)
 
 **Aggregation**:
+
 ```python
 cost_score = (
     latency_ms / 1000 +           # Normalize to 0-1
@@ -185,11 +212,13 @@ cost_score = (
 ### Collection Strategy
 
 **Option 1: Inline Instrumentation**
+
 - Wrap pattern execution with timer + memory profiler
 - Pros: Accurate, captures actual overhead
 - Cons: Adds measurement overhead (~5-10%)
 
 **Option 2: Sampling**
+
 - Profile 1% of patterns (randomly selected)
 - Estimate full profile from sample
 - Pros: Lower overhead
@@ -230,22 +259,22 @@ def extract_metadata(pattern, matching_traces):
         'domains': set(),
         'success_rate': 0,
     }
-    
+
     for trace in matching_traces:
         # Extract targets from matched subgraph nodes
         for node in pattern.nodes:
             metadata['targets'].add(node.type)
-        
+
         # Extract FSM types
         metadata['fsm_types'].add(trace.fsm_type)
-        
+
         # Extract domains
         metadata['domains'].add(trace.domain)
-        
+
         # Track success
         if trace.execution_successful:
             metadata['success_rate'] += 1
-    
+
     metadata['success_rate'] /= len(matching_traces)
     return metadata
 ```
@@ -268,25 +297,30 @@ def extract_metadata(pattern, matching_traces):
 ## Implementation Plan
 
 ### Phase 1: Exact Pattern Mining (Days 1-2)
+
 - Implement gSpan algorithm (or use networkx variant)
 - Parametrize min_frequency, max_size
 - Test on 100-trace sample corpus
 
 ### Phase 2: Canonicalization (Day 2-3)
+
 - Implement graph canonicalization (node sorting + hashing)
 - Exact deduplication: remove structural duplicates
 
 ### Phase 3: Fuzzy Matching (Day 3-4)
+
 - Implement Jaccard similarity
 - Implement GED (Hungarian algorithm)
 - Clustering: merge patterns > threshold
 
 ### Phase 4: Metadata + Profiling (Day 4-5)
+
 - Extract targets, FSM types, domains
 - Inline cost profiling
 - Validate accuracy on 1K-pattern corpus
 
 ### Phase 5: Optimization (Day 5-6)
+
 - Parallel pattern enumeration (multiprocessing)
 - Cache canonical forms
 - Optimize dedup (pre-filter by size, degree)
@@ -309,5 +343,4 @@ def extract_metadata(pattern, matching_traces):
 - **gSpan**: Yan et al., "gSpan: Graph-Based Substructure Pattern Mining" (2002)
 - **VF2**: Cordella et al., "A (Sub)Graph Isomorphism Algorithm for Matching Large Graphs" (2004)
 - **GED**: Riesen & Bunke, "Approximate Graph Edit Distance Computation..." (2009)
-- **NetworkX**: Python library with graph algorithms (https://networkx.org/)
-
+- **NetworkX**: Python library with graph algorithms (<https://networkx.org/>)

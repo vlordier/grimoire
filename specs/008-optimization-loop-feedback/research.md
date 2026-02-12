@@ -14,7 +14,8 @@ After extracting and ranking patterns, how do we ensure they remain effective as
 
 **Definition**: Systematic change in the statistical properties of the target variable over time.
 
-**Example**: 
+**Example**:
+
 - Pattern "IF temperature > 30, activate cooling" worked well in summer (80% success)
 - Same pattern in winter succeeds only 20% of the time (new distribution)
 
@@ -23,6 +24,7 @@ After extracting and ranking patterns, how do we ensure they remain effective as
 #### Option A: Fixed Threshold (Recommended for MVP)
 
 **Algorithm**:
+
 ```python
 effectiveness_30d = average(success_rate for last 30 days)
 effectiveness_60d = average(success_rate for days 30-60)
@@ -34,16 +36,19 @@ if drift_percentage < -15:  # More than 15% decline
 ```
 
 **Parameters**:
+
 - Window size: 30 days (tunable)
 - Threshold: 15% decline (tunable)
 - Metrics: success_rate, avg_quality, cost (latency/memory)
 
 **Pros**:
+
 - Simple, deterministic
 - No statistical assumptions
 - Fast to compute
 
 **Cons**:
+
 - Arbitrary threshold (requires tuning)
 - May have false positives (random noise)
 - Doesn't detect gradual/slow drift well
@@ -71,11 +76,13 @@ for day in recent_days:
 ```
 
 **Pros**:
+
 - Detects gradual drift earlier
 - Statistically principled
 - Well-researched (quality control)
 
 **Cons**:
+
 - More complex
 - Requires tuning (threshold, window)
 - Higher false positive rate initially
@@ -96,7 +103,8 @@ Track multiple metrics to avoid single-metric bias:
 | cost_score | 10% | 20% increase (different direction) |
 
 **Formula**:
-```
+
+```text
 drift_index = 0.4×(drift_success) + 0.35×(drift_quality) + 0.15×(drift_error) + 0.1×(drift_cost)
 
 if drift_index > 0.5:  # Combined threshold
@@ -114,37 +122,40 @@ class FeedbackEvent(BaseModel):
     event_id: str
     pattern_id: str
     trace_id: str
-    
+
     # Execution outcome
     success: bool                        # Did execution succeed?
     outcome_quality: int (0-10)          # Quality of result
     user_satisfaction: int (0-5)         # User feedback
-    
+
     # Performance metrics
     latency_ms: float                    # Execution time
     memory_mb: float                     # Peak memory
-    
+
     # Context
     domain: str (optional, e.g., "ml")
     fsm_type: str (optional)
     user_id: str (optional)
-    
+
     timestamp: ISO8601
 ```
 
 ### Collection Strategy
 
 **Option 1: Inline Collection (Recommended)**
+
 - Instrument pattern execution code
 - Collect metrics synchronously
 - Immediate availability, accurate but adds overhead (~5-10%)
 
 **Option 2: Asynchronous Collection**
+
 - Fire-and-forget: Send feedback to async queue
 - Process in batch later
 - Lower latency but risks data loss
 
 **Option 3: Sampling**
+
 - Collect 1% of events randomly
 - Extrapolate full statistics
 - Much lower overhead but statistical noise
@@ -158,6 +169,7 @@ class FeedbackEvent(BaseModel):
 **Problem**: Same pattern execution might be reported multiple times (retry logic, distributed tracing).
 
 **Solution**: Dedup by `(pattern_id, trace_id, timestamp_bucket)`
+
 - Keep latest event (overwrites stale)
 - Bucket by minute (tolerance for clock skew)
 
@@ -173,29 +185,33 @@ events[dedup_key] = event  # Overwrites if duplicate
 ### Buffering Strategy
 
 **Option 1: Batch Collection (Recommended)**
+
 - Buffer K=50 events
 - Or flush every T=10 seconds (whichever comes first)
 - Async aggregation (non-blocking)
 - Trade-off: latency (10s delay) vs throughput (50 events/batch)
 
 **Algorithm**:
+
 ```python
 buffer = []
 while True:
     event = await feedback_queue.get(timeout=10s)
     buffer.append(event)
-    
+
     if len(buffer) >= 50 or timeout_reached:
         aggregate_and_rank(buffer)
         buffer = []
 ```
 
 **Pros**:
+
 - Batching = efficient database writes
 - 10s delay acceptable for learning loop
 - 99.9% reliability with retry logic
 
 **Cons**:
+
 - Up to 10s delay before re-ranking
 - Loss possible if process crashes (mitigate with cleanup)
 
@@ -207,7 +223,7 @@ while True:
 
 **Per Pattern** (from N events in batch):
 
-```
+```text
 success_rate = count(success==True) / N
 avg_quality = sum(outcome_quality) / N
 avg_satisfaction = sum(user_satisfaction) / N
@@ -226,14 +242,15 @@ effective_success_rate = weighted_average(success_rate, weight)
 **Condition**: Every K=50 feedback events → trigger re-ranking of top-N patterns
 
 **Implementation**:
+
 ```python
 while True:
     batch = aggregate_feedback_batch()  # 50 events
     top_k_patterns = get_top_k_patterns(k=100)  # Affected patterns
-    
+
     new_scores = phase_32_rank(top_k_patterns, context)  # Phase 3.2 integration
     neo4j.update_rankings(new_scores)
-    
+
     log_rerank_event(reason="batch_feedback", patterns_affected=len(top_k_patterns))
 ```
 
@@ -313,13 +330,13 @@ v2_outcomes = [e.outcome_quality for e in feedback if e.experiment_variant]
 if len(v1_outcomes) >= 500 and len(v2_outcomes) >= 500:
     t_stat, p_value = ttest_ind(v1_outcomes, v2_outcomes)
     effect_size = cohens_d(v1_outcomes, v2_outcomes)
-    
+
     if p_value < 0.05 and effect_size > 0.2:
         # v2 is statistically significantly better
         winner = "v2"
     else:
         winner = "v1"
-    
+
     return ExperimentResult(winner=winner, p_value=p_value, effect_size=effect_size)
 ```
 
@@ -345,7 +362,8 @@ else:
 Patterns are versioned: `pattern_001_v1`, `pattern_001_v2`, etc.
 
 **Transitions**:
-```
+
+```text
 v1 (active)
 ├── v2 (tested, in A/B)
 │   └── PROMOTE → v2 (active), v1 (superseded)
@@ -358,17 +376,19 @@ v1 (active)
 ### Deprecation Rules
 
 **Automatic Deprecation** (if conditions met):
+
 - Success rate < 30% for 60+ days → LOW_EFFECTIVENESS
 - Error rate > 20% for 14+ days → HIGH_ERROR_RATE
 - Superseded by newer version → SUPERSEDED
 - Manual review → MANUAL_REVIEW
 
 **Process**:
+
 ```python
 for pattern in all_patterns:
     if pattern.success_rate < 0.3 and age_days > 60:
         mark_deprecated(pattern, reason="low_effectiveness_aged")
-    
+
     if pattern.error_rate > 0.2 and age_days > 14:
         mark_deprecated(pattern, reason="high_error_rate")
 ```
@@ -416,11 +436,13 @@ for pattern in all_patterns:
 ### Database Design
 
 **Table: FeedbackEvent**
+
 - Columns: event_id, pattern_id, trace_id, success, quality, satisfaction, latency, memory, timestamp
 - Index: (pattern_id, timestamp) for aggregation queries
 - Partitioned by timestamp (monthly) for retention
 
 **Table: ConceptDriftAlert**
+
 - Columns: alert_id, pattern_id, metric, old_value, new_value, drift_percentage, detection_time
 - Index: (pattern_id, detection_time)
 
@@ -447,4 +469,3 @@ for pattern in all_patterns:
 | Drift detection (per pattern) | <1s (hourly batch) |
 | Re-ranking (Phase 3.2 call) | <30s for 1000 patterns |
 | A/B statistical test | <1s |
-

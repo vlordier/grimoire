@@ -26,12 +26,12 @@ class PatternTarget(str, Enum):
 
 class Pattern(BaseModel):
     """Reusable reasoning pattern extracted from traces."""
-    
+
     pattern_id: str = Field(
         default_factory=lambda: f"pat_{uuid.uuid4().hex[:12]}",
         description="Unique pattern identifier"
     )
-    
+
     # Graph structure
     nodes: List[dict] = Field(
         description="List of nodes in the pattern graph. "
@@ -43,7 +43,7 @@ class Pattern(BaseModel):
         "Each: {source_id, target_id, relation_type}. "
         "Sorted edge list for determinism."
     )
-    
+
     # Metadata
     targets: Set[PatternTarget] = Field(
         description="What types of nodes/operations does this pattern match?"
@@ -57,7 +57,7 @@ class Pattern(BaseModel):
         default_factory=set,
         description="Problem domains: ml, finance, legal, healthcare, general"
     )
-    
+
     # Performance metrics
     success_rate: float = Field(
         ge=0.0, le=1.0,
@@ -67,12 +67,12 @@ class Pattern(BaseModel):
         ge=0.0, le=10.0,
         description="Average outcome quality when pattern applied (0-10)"
     )
-    
+
     cost_profile: Optional['CostProfile'] = Field(
         default=None,
         description="Execution cost: latency, memory, errors"
     )
-    
+
     # Lifecycle
     num_matching_traces: int = Field(
         ge=0,
@@ -84,7 +84,7 @@ class Pattern(BaseModel):
     last_updated: str = Field(
         description="ISO8601 timestamp of last update"
     )
-    
+
     # De-duplication tracking
     canonical_hash: str = Field(
         description="SHA256 hash of canonical form (for dedup)"
@@ -93,13 +93,13 @@ class Pattern(BaseModel):
         default_factory=list,
         description="Pattern IDs that were merged into this one (fuzzy dedup)"
     )
-    
+
     version: int = Field(
         default=1,
         ge=1,
         description="Version number (incremented on promotion)"
     )
-    
+
     class Config:
         use_enum_values = False
 ```
@@ -111,7 +111,7 @@ class Pattern(BaseModel):
 ```python
 class CostProfile(BaseModel):
     """Execution cost metrics for a pattern."""
-    
+
     latency_ms: float = Field(
         ge=0,
         description="Average execution latency (milliseconds)"
@@ -132,14 +132,14 @@ class CostProfile(BaseModel):
         default=None,
         description="Categorized errors: {error_type: count, ...}"
     )
-    
+
     # Derived
     cost_score: float = Field(
         ge=0,
         description="Normalized cost score (0=cheap, 1=expensive). "
         "Calculated as: (lat_ms/1000 + mem_mb/100 + err*10) / 3"
     )
-    
+
     sample_size: int = Field(
         ge=1,
         description="Number of executions sampled"
@@ -153,14 +153,14 @@ class CostProfile(BaseModel):
 ```python
 class PatternMatch(BaseModel):
     """A single occurrence of a pattern in a trace."""
-    
+
     match_id: str = Field(
         default_factory=lambda: f"m_{uuid.uuid4().hex[:12]}",
         description="Unique match identifier"
     )
     pattern_id: str = Field(description="Pattern that matched")
     trace_id: str = Field(description="TraceBundle ID containing match")
-    
+
     # Match details
     matched_node_ids: List[str] = Field(
         description="Step IDs from trace that matched pattern nodes"
@@ -168,13 +168,13 @@ class PatternMatch(BaseModel):
     matched_edge_ids: List[str] = Field(
         description="Edge indices from trace that matched pattern edges"
     )
-    
+
     # Quality
     similarity_score: float = Field(
         ge=0, le=1.0,
         description="How closely does this match the pattern? (0=poor, 1=exact)"
     )
-    
+
     # Outcome
     execution_successful: bool = Field(
         description="Did execution succeed at this match?"
@@ -183,7 +183,7 @@ class PatternMatch(BaseModel):
         ge=0, le=10.0,
         description="Quality of outcome at this match (0-10, None if unknown)"
     )
-    
+
     timestamp: str = Field(
         description="When was this match discovered (ISO8601)"
     )
@@ -196,11 +196,11 @@ class PatternMatch(BaseModel):
 ```python
 class ExtractionResult(BaseModel):
     """Output of pattern extraction operation."""
-    
+
     extraction_id: str = Field(
         default_factory=lambda: f"ext_{uuid.uuid4().hex[:12]}"
     )
-    
+
     # Results
     patterns_extracted: List[Pattern] = Field(
         description="List of extracted patterns"
@@ -208,7 +208,7 @@ class ExtractionResult(BaseModel):
     matches_found: List[PatternMatch] = Field(
         description="All pattern matches in input traces"
     )
-    
+
     # Stats
     num_input_traces: int = Field(ge=1)
     num_patterns: int = Field(ge=0)
@@ -217,7 +217,7 @@ class ExtractionResult(BaseModel):
         ge=0,
         description="How many patterns were merged during fuzzy dedup?"
     )
-    
+
     # Quality metrics
     avg_pattern_size: float = Field(
         description="Average nodes per pattern"
@@ -230,12 +230,12 @@ class ExtractionResult(BaseModel):
         ge=0, le=1.0,
         description="Proportion of traces covered by at least one pattern"
     )
-    
+
     # Performance
     extraction_duration_sec: float = Field(ge=0)
     dedup_duration_sec: float = Field(ge=0)
     total_duration_sec: float = Field(ge=0)
-    
+
     # Metadata
     extraction_timestamp: str = Field(description="ISO8601")
     parameters: dict = Field(
@@ -253,12 +253,12 @@ class ExtractionResult(BaseModel):
 ```python
 class ExtractionRequest(BaseModel):
     """API request for pattern extraction."""
-    
+
     trace_ids: List[str] = Field(
         min_items=1, max_items=100000,
         description="Trace IDs to extract patterns from"
     )
-    
+
     min_frequency: int = Field(
         default=5, ge=1,
         description="Min traces containing pattern (5 = top 0.05% of 10K)"
@@ -267,17 +267,17 @@ class ExtractionRequest(BaseModel):
         default=10, ge=2, le=50,
         description="Max nodes in pattern (balance: coverage vs complexity)"
     )
-    
+
     similarity_threshold: float = Field(
         default=0.9, ge=0.0, le=1.0,
         description="Jaccard threshold for fuzzy dedup (0.9 = very similar)"
     )
-    
+
     include_cost_profile: bool = Field(
         default=True,
         description="Compute cost profile for each pattern?"
     )
-    
+
     include_metadata: bool = Field(
         default=True,
         description="Extract targets, fsm_types, domains?"
@@ -289,7 +289,7 @@ class ExtractionRequest(BaseModel):
 ```python
 class ExtractionResponse(BaseModel):
     """API response for pattern extraction."""
-    
+
     extraction_id: str
     status: str = Field(
         description="SUCCESS | IN_PROGRESS | FAILED"
@@ -298,9 +298,9 @@ class ExtractionResponse(BaseModel):
         default=None,
         description="Full result (null if still processing)"
     )
-    
+
     error: Optional[str] = Field(default=None)
-    
+
     # For long-running requests
     progress_percent: int = Field(
         default=0, ge=0, le=100,
@@ -475,4 +475,3 @@ CREATE INDEX match_trace ON PatternMatch(trace_id)
   }
 }
 ```
-
