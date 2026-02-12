@@ -103,14 +103,103 @@ def check_transition(
 
 ### 2.3 Storage Integration
 
-**In Neo4j**:
-- Attach `step.danger_*` properties to Step nodes
-- Create `BLOCKED_BY_GUARD` edges from Step to Guard metadata
-- Store guard reason in edge properties
+#### Neo4j Cypher Templates
 
-**In Qdrant**:
-- Add danger scores to step_windows payload
-- Index by danger levels for filtering
+**Store Danger Scores on Step**
+```cypher
+// Attach danger scores to Step node
+MATCH (s:Step {step_id: $step_id})
+SET s.danger_ambiguity = $ambiguity,
+    s.danger_adversarial = $adversarial,
+    s.danger_irreversibility = $irreversibility,
+    s.danger_institutional = $institutional,
+    s.danger_computed_at = datetime(),
+    s.danger_classifier_version = $version
+RETURN s.step_id, s.danger_ambiguity, s.danger_adversarial
+```
+
+**Query Steps by Danger Level**
+```cypher
+// Find high-risk steps for review
+MATCH (s:Step)
+WHERE s.danger_ambiguity >= 0.7
+   OR s.danger_adversarial >= 0.6
+   OR s.danger_irreversibility >= 0.7
+   OR s.danger_institutional >= 0.6
+RETURN s.step_id, 
+       s.danger_ambiguity, 
+       s.danger_adversarial,
+       s.danger_irreversibility,
+       s.danger_institutional,
+       s.content[0..100] as preview
+ORDER BY (s.danger_ambiguity + s.danger_adversarial + 
+          s.danger_irreversibility + s.danger_institutional) DESC
+LIMIT 100
+```
+
+**Store Guard Block Decision**
+```cypher
+// Record when guard blocks a transition
+MATCH (s:Step {step_id: $step_id})
+CREATE (g:GuardDecision {
+  decision_id: $decision_id,
+  decision: 'BLOCK',
+  reason: $reason,
+  guard_name: $guard_name,
+  evidence_score: $evidence_score,
+  computed_at: datetime()
+})
+CREATE (s)-[:BLOCKED_BY_GUARD]->(g)
+RETURN g.decision_id
+```
+
+**Query Blocked Steps with Context**
+```cypher
+// Get blocked steps with trace context
+MATCH (t:Trace)-[:CONTAINS]->(s:Step)-[:BLOCKED_BY_GUARD]->(g:GuardDecision)
+WHERE g.computed_at > datetime() - duration('P7D')
+RETURN t.trace_id,
+       s.step_id,
+       s.step_type,
+       g.guard_name,
+       g.reason,
+       g.computed_at
+ORDER BY g.computed_at DESC
+```
+
+**Aggregate Danger Statistics**
+```cypher
+// Daily danger score distribution
+MATCH (s:Step)
+WHERE s.danger_computed_at > datetime() - duration('P1D')
+RETURN 
+  CASE 
+    WHEN s.danger_ambiguity >= 0.7 THEN 'high_ambiguity'
+    WHEN s.danger_adversarial >= 0.6 THEN 'high_adversarial'
+    WHEN s.danger_irreversibility >= 0.7 THEN 'high_irreversible'
+    WHEN s.danger_institutional >= 0.6 THEN 'high_institutional'
+    ELSE 'low_risk'
+  END as risk_category,
+  count(*) as count
+ORDER BY count DESC
+```
+
+#### Qdrant Payload Updates
+
+```python
+# Update step_windows collection with danger scores
+qdrant_client.set_payload(
+    collection_name="step_windows",
+    points=[step_id],
+    payload={
+        "danger_ambiguity": scores.ambiguity,
+        "danger_adversarial": scores.adversarial,
+        "danger_irreversibility": scores.irreversibility,
+        "danger_institutional": scores.institutional,
+        "danger_level": calculate_overall_level(scores)
+    }
+)
+```
 
 ### 2.4 Configuration
 

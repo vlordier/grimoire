@@ -237,6 +237,163 @@ PUT /v1/routing/config
 - **Output**: FSM type selection → used by Step creation
 - **Optional**: Danger scores (from 002) can refine confidence in Phase 3
 
+### Neo4j Cypher Templates
+
+**Store FSM Classification on Step**
+```cypher
+// Attach FSM classification to Step node
+MATCH (s:Step {step_id: $step_id})
+SET s.fsm_type = $fsm_type,
+    s.fsm_confidence = $confidence,
+    s.fsm_computed_at = datetime(),
+    s.fsm_router_version = $version
+RETURN s.step_id, s.fsm_type, s.fsm_confidence
+```
+
+**Query Steps by FSM Type**
+```cypher
+// Find all steps of a specific FSM type
+MATCH (t:Trace)-[:CONTAINS]->(s:Step)
+WHERE s.fsm_type = $fsm_type
+  AND s.fsm_confidence >= 0.7
+RETURN t.trace_id, s.step_id, s.content[0..100] as preview
+ORDER BY s.fsm_computed_at DESC
+LIMIT 100
+```
+
+**Aggregate FSM Distribution**
+```cypher
+// Distribution of FSM types across traces
+MATCH (s:Step)
+WHERE s.fsm_type IS NOT NULL
+RETURN s.fsm_type as fsm,
+       count(*) as count,
+       avg(s.fsm_confidence) as avg_confidence
+ORDER BY count DESC
+```
+
+**Find Traces by FSM Type for Pattern Extraction**
+```cypher
+// Get complete traces of specific FSM type (for Phase 3.1)
+MATCH (t:Trace)-[:CONTAINS]->(s:Step)
+WHERE s.fsm_type = $fsm_type
+  AND s.step_number = 0  // First step has FSM classification
+WITH t
+MATCH (t)-[:CONTAINS]->(all_steps:Step)
+RETURN t.trace_id,
+       collect(all_steps {.*}) as steps
+ORDER BY t.created_at DESC
+LIMIT 1000
+```
+
+### Hot-Reload Configuration
+
+```python
+import asyncio
+import aiofiles
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+class ConfigReloader(FileSystemEventHandler):
+    """Hot-reload routing configuration."""
+    
+    def __init__(self, config_path: str, router: FSMRouter):
+        self.config_path = config_path
+        self.router = router
+        self.last_reload = 0
+    
+    def on_modified(self, event):
+        if event.src_path == self.config_path:
+            # Debounce: wait 500ms after last change
+            current_time = time.time()
+            if current_time - self.last_reload > 0.5:
+                self.last_reload = current_time
+                asyncio.create_task(self.reload_config())
+    
+    async def reload_config(self):
+        """Reload configuration without restart."""
+        try:
+            async with aiofiles.open(self.config_path, 'r') as f:
+                content = await f.read()
+            
+            new_config = yaml.safe_load(content)
+            self.router.update_config(RoutingConfig(**new_config))
+            
+            logger.info(f"Reloaded routing config: {len(new_config['fsm_keyword_patterns'])} FSMs")
+        except Exception as e:
+            logger.error(f"Failed to reload config: {e}")
+
+# Setup file watcher
+def setup_hot_reload(config_path: str, router: FSMRouter):
+    """Set up file watcher for hot reload."""
+    observer = Observer()
+    handler = ConfigReloader(config_path, router)
+    observer.schedule(handler, path=os.path.dirname(config_path), recursive=False)
+    observer.start()
+    return observer
+
+# API endpoint for manual reload
+@app.post("/v1/config/reload")
+async def reload_config():
+    """Manually trigger configuration reload."""
+    try:
+        router.load_config()
+        return {
+            "status": "reloaded",
+            "fsm_count": len(router.config.fsm_keyword_patterns),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+```
+
+### Conflict Resolution
+
+```python
+def resolve_tie(scores: Dict[str, float], keywords_matched: Dict[str, List[str]]) -> str:
+    """
+    Resolve ties when multiple FSMs have same confidence.
+    Priority:
+    1. Most keywords matched (specificity)
+    2. FSM priority order (diagnose > design > optimize > ...)
+    3. Random (deterministic hash of problem text)
+    """
+    max_score = max(scores.values())
+    tied_fsms = [fsm for fsm, score in scores.items() if score == max_score]
+    
+    if len(tied_fsms) == 1:
+        return tied_fsms[0]
+    
+    # 1. Most specific (most keywords)
+    keyword_counts = {
+        fsm: len(keywords_matched.get(fsm, [])) 
+        for fsm in tied_fsms
+    }
+    max_keywords = max(keyword_counts.values())
+    most_specific = [fsm for fsm, count in keyword_counts.items() 
+                     if count == max_keywords]
+    
+    if len(most_specific) == 1:
+        return most_specific[0]
+    
+    # 2. Priority order
+    FSM_PRIORITY = [
+        "fsm_diagnose_fix",
+        "fsm_design_decide",
+        "fsm_optimize",
+        "fsm_verify",
+        "fsm_transform",
+        "fsm_clarify_frame"
+    ]
+    
+    for priority_fsm in FSM_PRIORITY:
+        if priority_fsm in most_specific:
+            return priority_fsm
+    
+    # 3. Deterministic fallback
+    return most_specific[0]
+```
+
 ---
 
 ## Phase 3: Testing

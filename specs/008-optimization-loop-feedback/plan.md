@@ -192,6 +192,279 @@ Build a closed-loop feedback system that continuously improves pattern rankings 
    - Promote new version, verify old version marked superseded
    - Query audit trail, verify all events logged
 
+## Event Bus Architecture
+
+### Technology Selection
+
+| Technology | Pros | Cons | Recommendation |
+|------------|------|------|----------------|
+| **Redis Streams** | Simple, existing infra, fast | Limited persistence, no replay | **MVP Choice** |
+| **RabbitMQ** | Mature, routing, reliable | Single point of failure, ops overhead | Alternative |
+| **Kafka** | Scalable, durable, replay | Complex ops, overkill for MVP | Future upgrade |
+| **AWS SNS/SQS** | Managed, scalable | Vendor lock-in, cost | Cloud option |
+
+**Decision**: Use **Redis Streams** for MVP, migrate to Kafka when scaling beyond 10K events/sec.
+
+### Event Bus Design
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     EVENT BUS (Redis Streams)                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Stream: grimoire:feedback:events                              │
+│  ├─ pattern_id                                                 │
+│  ├─ trace_id                                                   │
+│  ├─ event_type: EXECUTION_SUCCESS | EXECUTION_FAILURE          │
+│  ├─ payload: JSON (FeedbackEvent)                              │
+│  └─ timestamp                                                  │
+│                                                                 │
+│  Stream: grimoire:drift:alerts                                 │
+│  ├─ pattern_id                                                 │
+│  ├─ drift_type: EFFECTIVENESS | QUALITY | COST                │
+│  ├─ severity: WARNING | CRITICAL                               │
+│  └─ timestamp                                                  │
+│                                                                 │
+│  Stream: grimoire:ab:experiments                               │
+│  ├─ experiment_id                                              │
+│  ├─ event_type: VARIANT_A | VARIANT_B | CONCLUSION             │
+│  └─ timestamp                                                  │
+│                                                                 │
+│  Consumer Groups:                                              │
+│  ├─ feedback-processors (3 instances)                          │
+│  ├─ drift-detectors (2 instances)                            │
+│  └─ ab-test-routers (2 instances)                              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Event Schema
+
+```python
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
+from datetime import datetime
+
+class BusEvent(BaseModel):
+    """Base event for event bus."""
+    
+    event_id: str = Field(
+        default_factory=lambda: f"evt_{uuid.uuid4().hex[:16]}"
+    )
+    event_type: str = Field(
+        description="Type of event"
+    )
+    stream: str = Field(
+        description="Stream name"
+    )
+    timestamp: str = Field(
+        default_factory=lambda: datetime.utcnow().isoformat()
+    )
+    payload: dict = Field(
+        description="Event payload"
+    )
+    metadata: Optional[dict] = Field(
+        default=None,
+        description="Tracing, user context, etc."
+    )
+
+class FeedbackBusEvent(BusEvent):
+    """Feedback event for event bus."""
+    
+    event_type: Literal["FEEDBACK"] = "FEEDBACK"
+    stream: str = "grimoire:feedback:events"
+    payload: FeedbackEvent
+
+class DriftBusEvent(BusEvent):
+    """Drift alert event."""
+    
+    event_type: Literal["DRIFT_DETECTED"] = "DRIFT_DETECTED"
+    stream: str = "grimoire:drift:alerts"
+    payload: ConceptDriftAlert
+
+class ABTestBusEvent(BusEvent):
+    """A/B test routing event."""
+    
+    event_type: Literal["EXPERIMENT_ROUTING"] = "EXPERIMENT_ROUTING"
+    stream: str = "grimoire:ab:experiments"
+    payload: dict = Field(
+        description="{experiment_id, pattern_id, variant, trace_id}"
+    )
+```
+
+### Producer API
+
+```python
+class EventBusProducer:
+    """Produce events to Redis Streams."""
+    
+    def __init__(self, redis_client: redis.Redis):
+        self.redis = redis_client
+    
+    async def publish_feedback(
+        self, 
+        feedback: FeedbackEvent,
+        metadata: Optional[dict] = None
+    ) -> str:
+        """Publish feedback event."""
+        event = FeedbackBusEvent(
+            payload=feedback.dict(),
+            metadata=metadata
+        )
+        
+        event_id = self.redis.xadd(
+            "grimoire:feedback:events",
+            event.dict(),
+            maxlen=100000  # Keep last 100K events
+        )
+        return event_id
+    
+    async def publish_drift_alert(
+        self,
+        alert: ConceptDriftAlert
+    ) -> str:
+        """Publish drift alert."""
+        event = DriftBusEvent(payload=alert.dict())
+        
+        event_id = self.redis.xadd(
+            "grimoire:drift:alerts",
+            event.dict(),
+            maxlen=10000
+        )
+        return event_id
+```
+
+### Consumer API
+
+```python
+class EventBusConsumer:
+    """Consume events from Redis Streams."""
+    
+    def __init__(
+        self,
+        redis_client: redis.Redis,
+        consumer_group: str,
+        consumer_name: str
+    ):
+        self.redis = redis_client
+        self.group = consumer_group
+        self.name = consumer_name
+    
+    async def consume_feedback(
+        self,
+        handler: Callable[[FeedbackEvent], Awaitable[None]],
+        batch_size: int = 50
+    ):
+        """Consume feedback events."""
+        while True:
+            # Read from stream
+            messages = self.redis.xreadgroup(
+                groupname=self.group,
+                consumername=self.name,
+                streams={"grimoire:feedback:events": ">"},
+                count=batch_size,
+                block=5000  # 5 second timeout
+            )
+            
+            for stream, events in messages:
+                for event_id, fields in events:
+                    try:
+                        # Parse event
+                        event = FeedbackBusEvent(**fields)
+                        feedback = FeedbackEvent(**event.payload)
+                        
+                        # Process
+                        await handler(feedback)
+                        
+                        # Acknowledge
+                        self.redis.xack(
+                            "grimoire:feedback:events",
+                            self.group,
+                            event_id
+                        )
+                    except Exception as e:
+                        # Log error, don't ack (will be retried)
+                        logger.error(f"Failed to process {event_id}: {e}")
+    
+    async def claim_pending(
+        self,
+        min_idle_time: int = 60000  # 60 seconds
+    ):
+        """Claim pending messages from failed consumers."""
+        pending = self.redis.xpending_range(
+            "grimoire:feedback:events",
+            self.group,
+            min=min_idle_time,
+            count=10
+        )
+        
+        for item in pending:
+            # Claim and reprocess
+            claimed = self.redis.xclaim(
+                "grimoire:feedback:events",
+                self.group,
+                self.name,
+                min_idle_time,
+                [item['message_id']]
+            )
+            # Process claimed messages...
+```
+
+### Buffer Overflow Handling
+
+```python
+class FeedbackBuffer:
+    """In-memory buffer with overflow protection."""
+    
+    def __init__(
+        self,
+        max_size: int = 50,
+        overflow_strategy: str = "drop_oldest"
+    ):
+        self.buffer = deque(maxlen=max_size)
+        self.overflow_strategy = overflow_strategy
+        self.dropped_count = 0
+    
+    async def add(self, event: FeedbackEvent) -> bool:
+        """Add event to buffer."""
+        if len(self.buffer) >= self.max_size:
+            if self.overflow_strategy == "drop_oldest":
+                self.buffer.popleft()
+                self.dropped_count += 1
+            elif self.overflow_strategy == "trigger_flush":
+                await self.flush()
+            elif self.overflow_strategy == "alert":
+                await alert_ops("feedback_buffer_full")
+                return False
+        
+        self.buffer.append(event)
+        return True
+    
+    async def flush(self):
+        """Flush buffer to event bus."""
+        batch = list(self.buffer)
+        self.buffer.clear()
+        
+        # Publish to Redis
+        for event in batch:
+            await self.producer.publish_feedback(event)
+```
+
+### Monitoring
+
+```python
+# Metrics to expose
+EVENT_BUS_METRICS = {
+    "events_produced_total": Counter,
+    "events_consumed_total": Counter,
+    "events_failed_total": Counter,
+    "consumer_lag": Gauge,  # Pending messages
+    "buffer_size": Gauge,
+    "buffer_dropped_total": Counter,
+    "processing_latency": Histogram
+}
+```
+
 ## Dependencies
 
 ### Internal Dependencies
@@ -203,7 +476,7 @@ Build a closed-loop feedback system that continuously improves pattern rankings 
 
 ### External Dependencies
 - **Neo4j 5.x**: Graph persistence, pattern versioning relationships
-- **Event Queue**: Feedback collection (in-memory buffer or RabbitMQ)
+- **Redis 7.x**: Event bus (streams), caching
 - **Pydantic v2**: Data validation
 - **scipy/numpy**: Statistical testing (t-test, effect size)
 
