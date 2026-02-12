@@ -1,38 +1,36 @@
 <!--
   Sync Impact Report
   ===================
-  Version change: N/A → 1.0.0 (initial creation)
+  Version change: 1.0.0 → 1.1.0 (minor update - new principles added)
 
   Added principles:
-    - I. Recipe-First Architecture
-    - II. Verification Before Learning (NON-NEGOTIABLE)
-    - III. Federated Quality Control
-    - IV. Exploitation Before Exploration
-    - V. Test-First Development (NON-NEGOTIABLE)
+    - VI. Canonical Schema Contract (NON-NEGOTIABLE)
+    - VII. Dual-Store Architecture
+    - VIII. Provenance and Licensing
+    - IX. Privacy and Safety
+    - X. Continuous Evaluation and Improvement
 
-  Added sections:
-    - Core Principles (5 principles)
-    - Quality Gates
-    - Development Workflow
-    - Governance
+  Modified sections:
+    - Core Principles (expanded from 5 to 10 principles)
+    - Technical Stack (new section)
+    - Quality Gates (updated to reference new principles)
 
-  Removed sections: N/A (initial creation)
+  Removed sections: None
 
   Templates requiring updates:
     ✅ .specify/templates/plan-template.md
-       — No changes needed; Constitution Check section dynamically
-         reads gates from this file at plan time
+       — Constitution Check section will now validate new principles
     ✅ .specify/templates/spec-template.md
-       — No changes needed; scope/requirements sections compatible
+       — Already compatible with expanded principles
     ✅ .specify/templates/tasks-template.md
-       — No changes needed; task phases align with test-first and
-         quality gate principles
-    ✅ .specify/templates/checklist-template.md
-       — No changes needed; generic template compatible
-    ✅ .specify/templates/commands/*.md
-       — Directory does not exist; N/A
+       — Task phases align with all principles
+    ✅ Technical architecture documents
+       — Now formalized in constitution
 
-  Follow-up TODOs: None
+  Follow-up TODOs:
+    - Add schema version validation to ingestion pipeline
+    - Implement PII scrubbing in trace processing
+    - Create benchmark suite (200-500 prompts)
 -->
 
 # Grimoire Constitution
@@ -138,6 +136,125 @@ Non-negotiable rules:
 patterns MUST have strong correctness guarantees. Untested code in
 Grimoire is a liability that compounds across every recipe it touches.
 
+### VI. Canonical Schema Contract (NON-NEGOTIABLE)
+
+All data MUST conform to the canonical Pydantic schema. No subsystem
+may define its own incompatible data model.
+
+Non-negotiable rules:
+- The canonical schema (Trace, Step, Artifact, Edge, Pattern) is the
+  single contract across ingestion, storage, retrieval, and
+  evaluation.
+- All ingested data MUST be normalized to canonical form before
+  storage.
+- Schema versioning MUST be tracked; migrations MUST be explicit and
+  tested.
+- Breaking schema changes require MAJOR version bump (see Governance).
+- No subsystem may bypass the canonical schema or create parallel
+  data models.
+
+**Rationale**: Schema drift causes silent bugs in retrieval, mining,
+and pattern matching. A single canonical contract ensures all
+components interoperate correctly.
+
+### VII. Dual-Store Architecture
+
+Structure and semantics MUST be stored separately: graph database for
+relationships, vector database for retrieval.
+
+Non-negotiable rules:
+- Neo4j (or compatible graph DB) stores: Steps, Edges, Artifacts,
+  Patterns, and all relationships.
+- Qdrant (or compatible vector DB) stores: embeddings for Steps,
+  Windows, and Patterns with filterable metadata payloads.
+- Both stores MUST use the same canonical IDs (no parallel ID
+  schemes).
+- Vectors MUST include metadata sufficient for FSM/danger/domain
+  filtering without Neo4j roundtrip.
+- Graph queries validate structure; vector queries provide recall.
+
+**Rationale**: Hybrid storage enables both procedural constraints
+(graph) and semantic similarity (vectors) without compromising either.
+
+### VIII. Provenance and Licensing
+
+All ingested data MUST carry provenance metadata and license
+information. Unlicensed or improperly attributed data MUST NOT enter
+the system.
+
+Non-negotiable rules:
+- Every Trace MUST record: source type, source ID, license,
+  sensitivity level, ingestion timestamp, pipeline version.
+- Datasets with incompatible licenses (e.g., proprietary, no
+  redistribution) MUST NOT be ingested without explicit approval.
+- Attribution MUST be preserved through all transformations.
+- Promoted patterns MUST carry provenance from all contributing
+  traces.
+- License violations MUST trigger automatic rejection at ingestion.
+
+**Rationale**: Legal compliance and ethical AI require transparent
+provenance. Missing attribution creates liability and undermines
+trust.
+
+### IX. Privacy and Safety
+
+All traces MUST be screened for PII and unsafe content. Sensitive
+data MUST NOT leak into shared memory.
+
+Non-negotiable rules:
+- PII detection MUST run on all ingested text before storage.
+- Detected PII MUST be scrubbed or the trace rejected (depending on
+  sensitivity policy).
+- Sensitivity labels (PUBLIC/INTERNAL/CONFIDENTIAL/PII) MUST be
+  enforced in pattern promotion.
+- Only PUBLIC sensitivity traces may contribute to federated shared
+  memory.
+- Content safety gating MUST refuse generation of harmful, illegal,
+  or policy-violating patterns.
+
+**Rationale**: Privacy violations and unsafe content are
+non-negotiable failures. Local-only and federated modes have
+different privacy boundaries.
+
+### X. Continuous Evaluation and Improvement
+
+The system MUST measure its own performance and prune low-quality
+patterns. Evaluation is not optional.
+
+Non-negotiable rules:
+- A benchmark suite (minimum 200 prompts spanning archetypes) MUST
+  exist for routing and pattern quality evaluation.
+- Pattern quality metrics MUST include: support count, success proxy,
+  revision loop count, verification presence.
+- Patterns below quality thresholds MUST be demoted or pruned.
+- Threshold updates and router changes MUST be validated on the
+  benchmark before deployment.
+- Schema version, embedding model, and miner version MUST be tracked
+  for reproducibility.
+- Online learning loops MUST log: pattern usage, outcome proxies,
+  user feedback (when available).
+
+**Rationale**: Without continuous evaluation, pattern libraries
+degrade over time. Quality gates ensure only proven patterns survive.
+
+## Technical Stack
+
+The following technical decisions are architectural constraints:
+
+- **Primary Language**: Python 3.11+
+- **Schema Framework**: Pydantic >= 2
+- **Graph Database**: Neo4j (or compatible property graph DB)
+- **Vector Database**: Qdrant (or compatible with payload filtering)
+- **Embedding Models**: Version tracking REQUIRED; reproducibility MUST
+  be ensured across model updates
+- **ID Strategy**: ULID or UUID for all canonical entities
+- **FSMs**: 10 universal finite-state machines (see FSM-10.md)
+- **Danger Archetypes**: 4 categories (Ambiguity, Adversarial,
+  Irreversibility, Institutional)
+
+Changes to these require architectural review and MAJOR version bump
+if incompatible.
+
 ## Quality Gates
 
 All contributions MUST satisfy the following gates before merge:
@@ -154,6 +271,16 @@ All contributions MUST satisfy the following gates before merge:
    documentation updates where behavior changes.
 6. **Recipe Verification**: Any new or modified recipe MUST include
    at least one challenge-case test demonstrating correctness.
+7. **Schema Validation**: Changes to canonical schema MUST include
+   migration path, version bump, and backward compatibility analysis.
+8. **Provenance Check**: All new data sources MUST include license
+   information and attribution.
+9. **Privacy Review**: Traces containing PII MUST be flagged and
+   handled according to sensitivity policy.
+10. **Performance Regression**: Pattern retrieval and routing MUST
+    maintain sub-200ms latency (excluding embedding generation).
+11. **Benchmark Validation**: Changes to routing, FSM, or danger
+    classification MUST be validated on benchmark suite before merge.
 
 ## Development Workflow
 
@@ -199,4 +326,4 @@ decisions.
 - `speckit.analyze` validates spec/plan alignment with this document.
 - Violations MUST be resolved before merge; no exceptions.
 
-**Version**: 1.0.0 | **Ratified**: 2026-02-11 | **Last Amended**: 2026-02-11
+**Version**: 1.1.0 | **Ratified**: 2026-02-11 | **Last Amended**: 2026-02-12

@@ -31,7 +31,30 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Verify compliance with Grimoire Constitution (v1.1.0):
+
+**Core Principles**:
+- [ ] I. Recipe-First: Feature centers on recipes/patterns (not ad-hoc)
+- [ ] II. Verification Before Learning: All learning loops include verification (NON-NEGOTIABLE)
+- [ ] III. Federated Quality: Patterns pass quality gates before promotion
+- [ ] IV. Exploitation First: Reuses existing patterns where applicable
+- [ ] V. Test-First: TDD workflow planned (NON-NEGOTIABLE)
+- [ ] VI. Canonical Schema: Uses Pydantic schema contract (NON-NEGOTIABLE)
+- [ ] VII. Dual-Store: Graph (Neo4j) + Vector (Qdrant) architecture
+- [ ] VIII. Provenance: License and attribution tracking planned
+- [ ] IX. Privacy/Safety: PII scrubbing and sensitivity handling planned
+- [ ] X. Continuous Eval: Quality metrics and benchmarks defined
+
+**Technical Stack Compliance**:
+- [ ] Python 3.11+
+- [ ] Pydantic >= 2 for schemas
+- [ ] Neo4j for graph storage (or justified alternative)
+- [ ] Qdrant for vector storage (or justified alternative)
+- [ ] ULID/UUID for entity IDs
+- [ ] FSM-based procedural control where applicable
+- [ ] Danger archetype detection if risk present
+
+**If any principle is violated, document in Complexity Tracking section below**
 
 ## Project Structure
 
