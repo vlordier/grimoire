@@ -1,12 +1,11 @@
-Below is a **concise but complete PRD** for the final outcome of the project. It’s written as something you could actually circulate to engineers, researchers, or a board.
-
----
-
 # Product Requirements Document (PRD)
 
-## Product name (working)
+> **See also:** [Executive Summary](prd-executive.md) · [Project Specification](spec.md) · [System Architecture](../architecture/system-architecture.md) · [Capability Requirements](../architecture/capability-requirements.md) · [Build Plan](../architecture/build-plan.md)
 
-**Meta-Thought Engine (MTE)**
+## Product name
+
+**Grimoire**
+*Also known as:* Meta-Thought Engine (MTE)
 *Subtitle*: Procedural intelligence over reasoning traces
 
 ---
@@ -21,7 +20,7 @@ As a result, they:
 * cannot reuse reasoning strategies across domains,
 * cannot explain *why* a certain reasoning path was chosen.
 
-Humans, by contrast, reuse a small set of **procedural patterns** (“meta-thoughts”) across most problems.
+Humans, by contrast, reuse a small set of **procedural patterns** ("meta-thoughts") across most problems.
 
 **The problem:** There is no system that explicitly models, stores, retrieves, and enforces *procedural reasoning patterns* at scale.
 
@@ -85,7 +84,7 @@ This is a **procedural intelligence layer**.
 
 5. **Route reasoning through FSMs**
 
-   * ~10 universal finite-state machines
+   * 10 universal finite-state machines
    * Guards prevent invalid transitions (e.g. execute before clarify)
 
 6. **Extract and reuse meta-thoughts**
@@ -98,7 +97,7 @@ This is a **procedural intelligence layer**.
 
 7. **Recommend next procedural steps**
 
-   * Not “answers”
+   * Not "answers"
    * But *what kind of step should happen next*, with a template
 
 ---
@@ -244,11 +243,3 @@ It is a **control and reuse layer** over reasoning.
 ## 10. Final outcome (one sentence)
 
 > **A reusable, auditable, and safety-aware procedural intelligence engine that captures how problems are actually solved—and ensures future reasoning follows proven, appropriate paths.**
-
----
-
-If you want next, I can:
-
-* write a **1-page executive version**,
-* or a **technical architecture diagram (boxes + flows)**,
-* or a **roadmap (MVP → v1 → v2)**.

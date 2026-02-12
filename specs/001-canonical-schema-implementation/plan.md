@@ -26,7 +26,7 @@ Build foundational data ingestion pipeline that normalizes reasoning traces from
 
 **Storage**: 
 - **Neo4j 5.x**: Graph structure (Traces, Steps, Edges, Provenance metadata)
-- **Qdrant 0.11.x**: Vectors (step embeddings, window embeddings) with version binding and filterable payloads
+- **Qdrant ≥ 1.7**: Vectors (step embeddings, window embeddings) with version binding and filterable payloads
 - **AWS S3 / GCS**: Markdown text versions with audit trail (version_number, content_hash, contributor_id, timestamp, change_note)
 
 **Testing**: `pytest` with integration tests for both 114K and 1.2M datasets (per Constitution Principle V TDD)
@@ -223,7 +223,7 @@ class Trace(BaseModel):
     created_at: datetime
     updated_at: datetime
     status: str = "ingested"                # ingested, validated, processed, failed
-    trace_version: str = "1.0"              # Semver for versioning (same problem, different approaches)
+    trace_version: int = 1                  # Integer version; increments when same problem re-solved
     
     n_steps: int                            # Step count for quick access
     outcome: Optional[Dict[str, Any]] = None  # Result summary (JSON serializable)

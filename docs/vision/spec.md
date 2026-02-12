@@ -1,11 +1,17 @@
+# Grimoire — Project Specification
+
+> **See also:** [Product Requirements Document](prd.md) · [Executive Summary](prd-executive.md) · [System Architecture](../architecture/system-architecture.md) · [Problem Archetypes](../domain/problem-archetypes.md) · [Canonical Schemas](../reference/canonical-schemas.md)
+
+---
+
 In simple terms:
 
-We’re trying to build a system where an AI doesn’t solve every problem from scratch.
+Grimoire builds a system where an AI does not solve every problem from scratch.
 
 Instead, it:
 
 1. **Remembers how it solved similar problems before.**
-2. **Reuses good solution patterns (“recipes”).**
+2. **Reuses good solution patterns ("recipes").**
 3. **Improves those recipes over time.**
 4. **Shares the best ones across users safely.**
 
@@ -13,10 +19,10 @@ Instead, it:
 
 ## The Core Idea
 
-Think of it like building a **living cookbook for problem solving**.
+The system functions as a **living cookbook for problem solving**.
 
 * A *recipe* is not a full solution.
-* It’s a structured way of thinking:
+* It is a structured way of thinking:
 
   * what to check first
   * what variables to define
@@ -30,22 +36,22 @@ Over time, the system builds a large library of these reusable patterns.
 
 ## How It Works (Step by Step)
 
-### 1️⃣ A new problem comes in
+### 1. A new problem comes in
 
 The AI:
 
 * Summarizes what the problem really is.
 * Extracts constraints (time limit? tools available? domain?).
 
-This creates a clean “problem signature”.
+This creates a clean "problem signature".
 
 ---
 
-### 2️⃣ It looks up a good starting recipe
+### 2. It looks up a good starting recipe
 
-Instead of thinking randomly, it asks:
+Instead of reasoning from scratch, the system asks:
 
-> “Have we seen something like this before?”
+> "Has a similar problem been solved before?"
 
 It retrieves:
 
@@ -56,7 +62,7 @@ This is **exploitation** — reuse what already works.
 
 ---
 
-### 3️⃣ It executes the recipe carefully
+### 3. It executes the recipe carefully
 
 It runs through the structured steps:
 
@@ -76,7 +82,7 @@ This is **controlled exploration**.
 
 ---
 
-### 4️⃣ It verifies the result
+### 4. It verifies the result
 
 Before declaring success:
 
@@ -87,7 +93,7 @@ This is crucial — otherwise it would just learn from hallucinations.
 
 ---
 
-### 5️⃣ It learns from the outcome
+### 5. It learns from the outcome
 
 If the recipe worked:
 
@@ -102,8 +108,7 @@ If it failed:
 
 It proposes improvements.
 
-But — and this is important —
-those improvements are **not immediately shared with everyone**.
+Critically, those improvements are **not immediately shared with all users**.
 
 ---
 
@@ -132,7 +137,7 @@ This keeps the shared memory high-quality.
 
 ## Exploration vs Exploitation
 
-You want both:
+Both are needed:
 
 * **Exploitation** = reuse proven recipes to solve problems cheaply and reliably.
 * **Exploration** = when something breaks, try variations and discover better patterns.
@@ -142,41 +147,35 @@ The system balances them:
 * Start with exploitation.
 * Explore only when needed.
 * Keep what proves robust.
-* Discard what doesn’t.
+* Discard what doesn't.
 
 ---
 
-## What We’re Really Building
+## System Layers
 
-We are building:
+| Layer               | Purpose                                 |
+| ------------------- | --------------------------------------- |
+| Canonical schema    | One format for all reasoning traces     |
+| Graph store (Neo4j) | Structure: steps, edges, artifacts      |
+| Vector store (Qdrant)| Semantics: similar steps/patterns      |
+| Danger router       | Detect high-risk problems early         |
+| FSM engine          | Enforce disciplined reasoning           |
+| Pattern library     | Reusable "meta-thoughts"                |
+| Recommender         | Suggest next step from best patterns    |
+| Evaluation loop     | Track what works, prune what doesn't    |
+| Federated layer     | Share safely across users               |
 
-> A continuously improving reasoning engine
-> that accumulates structured thinking patterns
-> and gets better at solving problems over time.
-
-Not just a bigger prompt.
-
-Not just retrieval.
-
-Not just search.
-
-But a system that:
-
-* Stores mid-level reasoning strategies.
-* Verifies them.
-* Evolves them.
-* Prunes bad ones.
-* Shares the good ones.
+> **Note:** The federated layer is a long-term goal. No technical design exists yet. See the [Build Plan](../architecture/build-plan.md) for the current phased roadmap, which focuses on the single-instance system first.
 
 ---
 
 ## The Long-Term Outcome
 
-After enough problems:
+The long-term outcome is a system that:
 
-* The AI becomes more stable.
-* It makes fewer random reasoning errors.
-* It solves tasks faster.
-* Smaller models behave like larger ones.
-* Knowledge doesn’t disappear between runs.
-* And improvements compound over time.
+* Starts from proven procedures.
+* Adapts when needed.
+* Improves automatically.
+* Maintains safety invariants.
+
+All of this operates **transparently and auditably**.

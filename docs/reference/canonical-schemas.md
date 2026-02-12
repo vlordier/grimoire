@@ -1,5 +1,12 @@
 # Canonical Schemas
 
+> **Authoritative Pydantic v2 contract** for the entire system. All ingestion, storage, mining, and retrieval layers import from or align to these models.
+>
+> **See also:** [Storage Mapping](storage-mapping.md) (Neo4j + Qdrant implementation) · [Qdrant Setup](qdrant-setup.md) · [Pattern Detection & Pipeline](pattern-detection-and-pipeline.md) · [FSM Catalogue](../domain/fsm-catalogue.md) · [Danger Classification](../domain/danger-classification.md) · [Feature Spec: Canonical Schema Implementation](../../specs/001-canonical-schema-implementation/)
+
+---
+
+```python
 """
 canonical_schema.py (Pydantic v2)
 
@@ -66,7 +73,6 @@ class Sensitivity(str, Enum):
 
 
 class DomainTag(str, Enum):
-    # keep small; extend with your own taxonomy
     GENERAL = "general"
     SOFTWARE = "software"
     ML = "ml"
@@ -79,7 +85,6 @@ class DomainTag(str, Enum):
 
 
 class ToolName(str, Enum):
-    # optional: include your known tool names
     NONE = "none"
     PYTHON = "python"
     SQL = "sql"
@@ -105,10 +110,10 @@ class LicenseInfo(BaseModel):
 
 class SourceRef(BaseModel):
     source_type: SourceType
-    source_id: Optional[str] = None  # e.g., HF dataset name, repo slug
+    source_id: Optional[str] = None
     uri: Optional[HttpUrl] = None
-    split: Optional[str] = None  # train/test/validation
-    record_id: Optional[str] = None  # original record key
+    split: Optional[str] = None
+    record_id: Optional[str] = None
     created_at: Optional[datetime] = None
 
 
@@ -117,7 +122,6 @@ class Provenance(BaseModel):
     license_info: LicenseInfo = Field(default_factory=LicenseInfo)
     sensitivity: Sensitivity = Sensitivity.PUBLIC
 
-    # pipeline lineage
     ingested_at: Optional[datetime] = None
     pipeline_version: Optional[str] = None
     schema_version: str = "v1"
@@ -129,7 +133,6 @@ class Provenance(BaseModel):
 # -----------------------------
 
 class FSMId(str, Enum):
-    # ~10 universal FSMs
     CLARIFY_FRAME = "fsm_clarify_frame"
     DIAGNOSE_FIX = "fsm_diagnose_fix"
     DESIGN_DECIDE = "fsm_design_decide"
@@ -143,7 +146,6 @@ class FSMId(str, Enum):
 
 
 class FSMState(str, Enum):
-    # shared state vocabulary
     S0_INTAKE = "S0_intake"
     S1_CLARIFY = "S1_clarify"
     S2_MODEL = "S2_model"
@@ -180,6 +182,11 @@ class DangerType(str, Enum):
 
 class DangerScores(BaseModel):
     scores: Dict[DangerType, float] = Field(default_factory=dict)
+    evidence: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Top regex hits + probe answers for debuggability. "
+        "See DangerEvidence in danger_router_pydantic.py for the full typed model.",
+    )
 
     @model_validator(mode="after")
     def _ensure_keys(self) -> "DangerScores":
@@ -197,13 +204,10 @@ class DangerScores(BaseModel):
 
 class EmbeddingRef(BaseModel):
     embedding_id: IdStr
-    model: str  # e.g., "text-embedding-3-large" or local model name
+    model: str
     dim: int
-    # where it lives (vector DB key, file path, etc.)
     storage_key: str
     created_at: Optional[datetime] = None
-
-    # optional: normalized content hash to avoid duplicates
     content_hash: Optional[str] = None
 
 
@@ -238,17 +242,10 @@ class Artifact(BaseModel):
     title: Optional[str] = None
     text: Optional[str] = None
 
-    # common structured fields (optional, depending on type)
     tags: List[str] = Field(default_factory=list)
     domain: Optional[DomainTag] = None
-
-    # “authority level” / priority for constraints, etc.
     priority: Optional[int] = Field(default=None, ge=0, le=10)
-
-    # generic structured payload (keep small; don’t dump huge blobs)
     data: Dict[str, Any] = Field(default_factory=dict)
-
-    # embeddings (optional)
     embedding: Optional[EmbeddingRef] = None
 
 
@@ -258,7 +255,7 @@ class Artifact(BaseModel):
 
 class ToolCall(BaseModel):
     tool: ToolName = ToolName.NONE
-    name: Optional[str] = None  # e.g., specific function name
+    name: Optional[str] = None
     args: Dict[str, Any] = Field(default_factory=dict)
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
@@ -272,29 +269,17 @@ class Step(BaseModel):
     index: int = Field(ge=0)
     created_at: Optional[datetime] = None
 
-    # speaker / origin
     actor: Literal["user", "assistant", "tool", "system"] = "assistant"
-
     role: StepRole = StepRole.OTHER
     text: str
 
-    # FSM annotations (can be filled by your labeler)
     fsm_id: Optional[FSMId] = None
     fsm_state: Optional[FSMState] = None
-
-    # danger routing snapshot at the time of this step (optional)
     danger: Optional[DangerScores] = None
 
-    # tool details if relevant
     tool_call: Optional[ToolCall] = None
-
-    # references to artifacts mentioned/created/used
     artifact_refs: List[IdStr] = Field(default_factory=list)
-
-    # embeddings for retrieval
     embedding: Optional[EmbeddingRef] = None
-
-    # lightweight quality/properties for mining
     properties: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("text")
@@ -320,7 +305,9 @@ class EdgeType(str, Enum):
     MENTIONS = "mentions"
     EVIDENCE_FOR = "evidence_for"
     DECISION_FOR = "decision_for"
-    INSTANCE_OF = "instance_of"  # step/trace belongs to a Pattern
+    INSTANCE_OF = "instance_of"
+    CREATES = "creates"
+    USES = "uses"
     OTHER = "other"
 
 
@@ -338,13 +325,12 @@ class NodeRef(BaseModel):
 
 class Edge(BaseModel):
     edge_id: IdStr
-    trace_id: Optional[IdStr] = None  # helpful if you scope edges per trace
+    trace_id: Optional[IdStr] = None
 
     type: EdgeType
     src: NodeRef
     dst: NodeRef
 
-    # optional qualifiers
     weight: Optional[float] = Field(default=None, ge=0.0)
     label: Optional[str] = None
     data: Dict[str, Any] = Field(default_factory=dict)
@@ -362,17 +348,9 @@ class Trace(BaseModel):
     tags: List[str] = Field(default_factory=list)
 
     provenance: Provenance = Field(default_factory=Provenance)
-
-    # optional: initial problem statement (normalized)
     problem: Optional[str] = None
-
-    # danger snapshot at start
     initial_danger: Optional[DangerScores] = None
-
-    # success / outcome proxy (optional, but useful for mining)
     outcome: Dict[str, Any] = Field(default_factory=dict)
-
-    # counts
     n_steps: Optional[int] = Field(default=None, ge=0)
 
     created_at: Optional[datetime] = None
@@ -391,36 +369,27 @@ class PatternType(str, Enum):
 
 
 class PatternTemplateStep(BaseModel):
-    # a normalized template step: role/state + text with slots
     role: StepRole
     fsm_state: Optional[FSMState] = None
-    text_template: str  # e.g., "Define metric: {metric} with target {target}"
-
-    # slot definitions
-    slots: Dict[str, str] = Field(default_factory=dict)  # slot_name -> description
+    text_template: str
+    slots: Dict[str, str] = Field(default_factory=dict)
 
 
 class PatternApplicability(BaseModel):
-    # when to use this pattern
     fsm_id: Optional[FSMId] = None
     allowed_states: List[FSMState] = Field(default_factory=list)
-
     domains: List[DomainTag] = Field(default_factory=list)
     required_tags: List[str] = Field(default_factory=list)
     forbidden_tags: List[str] = Field(default_factory=list)
-
-    # danger conditions (e.g. requires ambiguity low)
     min_danger: Dict[DangerType, float] = Field(default_factory=dict)
     max_danger: Dict[DangerType, float] = Field(default_factory=dict)
 
 
 class PatternQuality(BaseModel):
-    # quality signals and aggregates; populate from mining
-    support: int = Field(default=0, ge=0)  # number of instances
+    support: int = Field(default=0, ge=0)
     avg_revision_loops: Optional[float] = Field(default=None, ge=0.0)
     verification_rate: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     success_proxy: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-
     last_updated_at: Optional[datetime] = None
 
 
@@ -433,14 +402,9 @@ class Pattern(BaseModel):
 
     applicability: PatternApplicability = Field(default_factory=PatternApplicability)
     template: List[PatternTemplateStep] = Field(default_factory=list)
-
-    # canonical embedding for semantic retrieval
     embedding: Optional[EmbeddingRef] = None
-
-    # quality stats
     quality: PatternQuality = Field(default_factory=PatternQuality)
 
-    # provenance/versioning
     created_at: Optional[datetime] = None
     miner_version: Optional[str] = None
     schema_version: str = "v1"
@@ -451,13 +415,8 @@ class PatternInstance(BaseModel):
     pattern_id: IdStr
     trace_id: IdStr
 
-    # which steps instantiate the pattern
     step_ids: List[IdStr] = Field(default_factory=list)
-
-    # extracted slot values (if any)
     bindings: Dict[str, Any] = Field(default_factory=dict)
-
-    # outcome info for this instance
     success_proxy: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
 
@@ -471,13 +430,11 @@ class TraceBundle(BaseModel):
     artifacts: List[Artifact] = Field(default_factory=list)
     edges: List[Edge] = Field(default_factory=list)
 
-    # optional: mined patterns attached
     patterns: List[Pattern] = Field(default_factory=list)
     pattern_instances: List[PatternInstance] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _basic_consistency(self) -> "TraceBundle":
-        # ensure step.trace_id matches
         for s in self.steps:
             if s.trace_id != self.trace.trace_id:
                 raise ValueError(f"step {s.step_id} trace_id mismatch")
@@ -494,11 +451,22 @@ def make_node_ref_step(step_id: str) -> NodeRef:
 
 def make_node_ref_artifact(artifact_id: str) -> NodeRef:
     return NodeRef(type=NodeRefType.ARTIFACT, id=artifact_id)
+```
 
-Notes on how to use this schema (quick)
+---
 
-Ingestion: convert any dataset record into a TraceBundle(trace, steps, artifacts, edges) even if you initially only fill steps + NEXT edges.
+## Usage notes
 
-Labeling: later enrich Step.fsm_id, Step.fsm_state, Step.role, Step.danger.
+1. **Ingestion:** Convert any dataset record into a `TraceBundle(trace, steps, artifacts, edges)` — even if you initially only fill steps + `NEXT` edges.
+2. **Labeling:** Later enrich `Step.fsm_id`, `Step.fsm_state`, `Step.role`, `Step.danger`.
+3. **Mining:** Create `Pattern` + `PatternInstance`, and add `INSTANCE_OF` edges if you want the graph to expose it directly.
 
-Mining: create Pattern + PatternInstance, and add INSTANCE_OF edges if you want the graph to expose it directly.
+---
+
+## See also
+
+- [Feature Spec: Canonical Schema Implementation - Data Model](/specs/001-canonical-schema-implementation/data-model.md) — Pydantic v2 implementations with validators and examples
+- [Storage Mapping Reference](storage-mapping.md) — How canonical schemas map to Neo4j properties and Qdrant payloads
+- [Ingestion API Contract](/specs/001-canonical-schema-implementation/contracts/ingestion-api.md) — HuggingFace dataset normalization pipeline
+- [Storage API Contract](/specs/001-canonical-schema-implementation/contracts/storage-api.md) — Neo4j persistence with atomic transactions
+- [Retrieval API Contract](/specs/001-canonical-schema-implementation/contracts/retrieval-api.md) — Qdrant vector search with metadata filtering

@@ -1,470 +1,469 @@
 # Retrieval API Contract (Qdrant Vector Search)
 
-**Component**: Qdrant Vector Database Search Layer  
-**Input**: Vector query + filters (similar to Step embeddings)  
-**Output**: Ranked list of Steps with metadata + text_key references  
+> **Version 4 (Pass 4)**: Complete rewrite from canonical schemas. Aligns query filters, response types, and examples to [Canonical Schemas](../../docs/reference/canonical-schemas.md) and [Storage Mapping](../../docs/reference/storage-mapping.md).
+>
+> **Component**: Qdrant Vector Database Query Layer  
+> **Input**: Vector query + filters (semantic search over Step or Pattern embeddings)  
+> **Output**: Ranked list of Steps/Patterns with full metadata + text references  
+> **Requires**: qdrant-client ≥ 1.7, pydantic 2
 
 ---
 
-## Connection & Collection Management
+## Connection & Health
 
 ```python
-class QdrantClient:
-    def __init__(self, url: str = "http://localhost:6333"):
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams
+
+class QdrantConnection:
+    def __init__(self, url: str = "http://localhost:6333", api_key: Optional[str] = None):
         """
-        url: "http://localhost:6333" or "https://prod-qdrant.api.com"
+        url: "http://localhost:6333" (local) or "https://prod-qdrant.api.com" (cloud)
+        api_key: Optional API key for cloud deployments
         """
-        self.client = qdrant_client.QdrantClient(url=url)
+        self.client = QdrantClient(url=url, api_key=api_key)
     
     def health_check(self) -> bool:
-        """Verify Qdrant server availability"""
+        """Verify Qdrant server is healthy"""
         try:
-            info = self.client.get_collection("steps")
-            return info is not None
-        except Exception:
+            info = self.client.get_collections()
+            return len(info.collections) > 0
+        except Exception as e:
+            logger.error(f"Qdrant health check failed: {e}")
             return False
-```
 
-### Collection Initialization (FR-006: Steps collection)
 
-```python
-def init_collection(qdrant_client: QdrantClient):
-    """Create 'steps' collection with vector config on app startup"""
-    try:
-        qdrant_client.client.create_collection(
-            collection_name="steps",
-            vectors_config=VectorsConfig(
-                size=384,  # Embedding dimension (all-MiniLM-L6-v2)
-                distance=Distance.COSINE
-            ),
-            optimizers_config=OptimizersConfig(
-                default_segment_number=5,
-                snapshot_on_idle=True  # Auto-snapshot for durability
+def ensure_collections(qdrant_client: QdrantClient):
+    """
+    Initialize three collections on app startup (idempotent).
+    see [Qdrant Setup](../../docs/reference/qdrant-setup.md) for full config.
+    """
+    collections_config = [
+        ("steps", 384),           # Sentence-transformers output dimension
+        ("step_windows", 384),    # FSM context windows
+        ("patterns", 384)         # Pattern prototypes
+    ]
+    
+    for collection_name, dim in collections_config:
+        try:
+            qdrant_client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(size=dim, distance=Distance.COSINE)
             )
-        )
-        logger.info("Created Qdrant collection 'steps'")
-        
-    except Exception as e:
-        if "already" in str(e):
-            logger.debug("Collection 'steps' already exists")
-        else:
-            raise
+        except Exception as e:
+            if "already" in str(e).lower():
+                logger.debug(f"Collection '{collection_name}' already exists")
+            else:
+                raise
 ```
 
 ---
 
 ## Write API: Index Embeddings
 
-### Operation: Upsert Step Embeddings (from Ingestion)
+### Operation: Upsert Step Embedding (from Ingestion)
 
 ```python
-def index_step_embeddings(qdrant_client: QdrantClient,
-                         step_id: str,
-                         trace_id: str,
-                         vector: List[float],
-                         step_metadata: Dict) -> IndexResult:
+from qdrant_client.models import PointStruct
+
+def index_step_embedding(
+    qdrant_client: QdrantClient,
+    step_id: str,
+    trace_id: str,
+    vector: List[float],
+    step_metadata: Dict[str, Any]
+) -> bool:
     """
-    Store embedding vector with filterable metadata (payload).
-    Called by ingestion-api.md after generating embeddings for a step.
+    Store step embedding vector + searchable payload into 'steps' collection.
+    Called by ingestion pipeline after generating embeddings.
+    
+    Payload schema:
+    - Identifiers: step_id, trace_id, index
+    - Semantics: role, actor, domain, tags
+    - Danger: (Phase 2) danger_ambiguity, danger_adversarial, etc.
+    - Versioning: embedding_model, embedding_dim, text_hash
     """
     try:
-        qdrant_client.client.upsert(
+        payload = {
+            # Identifiers
+            "step_id": step_id,
+            "trace_id": trace_id,
+            "index": step_metadata.get("index", 0),
+            
+            # Semantics
+            "role": step_metadata.get("role", "other"),
+            "actor": step_metadata.get("actor", "system"),
+            "domain": step_metadata.get("domain", "general"),
+            "tags": step_metadata.get("tags", []),
+            
+            # Danger markers (Phase 2: default to 0)
+            "danger_ambiguity": step_metadata.get("danger_ambiguity", 0.0),
+            "danger_adversarial": step_metadata.get("danger_adversarial", 0.0),
+            "danger_irreversibility": step_metadata.get("danger_irreversibility", 0.0),
+            "danger_institutional": step_metadata.get("danger_institutional", 0.0),
+            
+            # Versioning
+            "embedding_model": step_metadata.get("embedding_model", "all-MiniLM-L6-v2"),
+            "embedding_dim": step_metadata.get("embedding_dim", 384),
+            "text_hash": step_metadata.get("text_hash", None),
+            
+            # Timestamps
+            "created_at": datetime.now().isoformat()
+        }
+        
+        qdrant_client.upsert(
             collection_name="steps",
-            points=[Point(
-                id=hash_to_int(step_id),  # Qdrant requires integer IDs
+            points=[PointStruct(
+                id=step_id,
                 vector=vector,
-                payload={
-                    # Step identity
-                    "trace_id": trace_id,
-                    "step_id": step_id,
-                    "step_index": step_metadata["index"],
-                    "role": step_metadata["role"],
-                    
-                    # Trace identity
-                    "domain": step_metadata["domain"],
-                    "trace_title": step_metadata["trace_title"],
-                    
-                    # Versioning (FR-006a: bind to text version)
-                    "text_version_bound": step_metadata["text_version"],
-                    "embedding_version": step_metadata["embedding_version"],
-                    "text_hash": step_metadata["text_hash"],
-                    
-                    # Danger markers (Phase 2: computed from context)
-                    "danger_ambiguity": 0.0,
-                    "danger_adversarial": 0.0,
-                    "danger_irreversibility": 0.0,
-                    "danger_institutional": 0.0,
-                    
-                    # Timestamps
-                    "created_at": datetime.now().isoformat()
-                }
+                payload=payload
             )]
         )
         
-        return IndexResult(
-            success=True,
-            step_id=step_id,
-            vector_dim=len(vector),
-            stored_at=datetime.now()
-        )
-        
+        logger.debug(f"Indexed step {step_id} into Qdrant")
+        return True
+    
     except Exception as e:
-        logger.error(f"Failed to index embedding for step {step_id}: {e}")
-        return IndexResult(success=False, error=str(e))
+        logger.error(f"Failed to index step {step_id}: {e}")
+        return False
 ```
 
 ---
 
-## Query API: Vector Search
+## Query API: Semantic Search
 
-### Query 1: Semantic Search (Find Similar Steps)
+### Query 1: Search Similar Steps
 
 ```python
-def search_similar_steps(qdrant_client: QdrantClient,
-                        query_vector: List[float],
-                        limit: int = 10,
-                        filters: Optional[Dict] = None) -> SearchResult:
+from qdrant_client.models import FieldCondition, MatchValue, Filter
+from pydantic import BaseModel, Field
+from typing import Optional, List
+
+class StepSearchRequest(BaseModel):
+    """Request: find steps similar to a query vector"""
+    
+    query_vector: List[float] = Field(
+        ...,
+        description="Embedding vector (384-dim for all-MiniLM-L6-v2)",
+        min_length=384,
+        max_length=384
+    )
+    
+    limit: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Max results to return"
+    )
+    
+    # Filters (all optional; combined with AND)
+    filters: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Metadata filters to apply before ranking"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "query_vector": [0.123, 0.456, ...],  # 384 floats
+                "limit": 10,
+                "filters": {
+                    "domain": "ml",
+                    "role": "observation",
+                    "min_danger_irreversibility": 0.5
+                }
+            }
+        }
+
+
+def search_similar_steps(
+    qdrant_client: QdrantClient,
+    req: StepSearchRequest
+) -> StepSearchResponse:
     """
-    Find steps most similar to query vector.
-    Optionally filter by domain, role, or other metadata.
+    Semantic search: find steps closest to query_vector.
+    Apply filters server-side for efficiency.
     """
-    # Build filter if provided
-    query_filter = None
-    if filters:
-        conditions = []
-        if "domain" in filters:
-            conditions.append(HasValueFilter(
+    
+    # Build Qdrant filter from request
+    conditions = []
+    
+    if req.filters:
+        if "domain" in req.filters:
+            conditions.append(FieldCondition(
                 key="domain",
-                value=filters["domain"]
+                match=MatchValue(value=req.filters["domain"])
             ))
-        if "role" in filters:
-            conditions.append(HasValueFilter(
+        
+        if "role" in req.filters:
+            conditions.append(FieldCondition(
                 key="role",
-                value=filters["role"]
+                match=MatchValue(value=req.filters["role"])
             ))
-        if "trace_id" in filters:
-            conditions.append(HasValueFilter(
+        
+        if "trace_id" in req.filters:
+            conditions.append(FieldCondition(
                 key="trace_id",
-                value=filters["trace_id"]
+                match=MatchValue(value=req.filters["trace_id"])
             ))
         
-        if conditions:
-            query_filter = Filter(must=conditions)
+        if "danger_ambiguity" in req.filters:
+            # Range filter: steps with danger_ambiguity >= threshold
+            min_val = req.filters.get("min_danger_ambiguity", 0.0)
+            conditions.append(FieldCondition(
+                key="danger_ambiguity",
+                range=FieldCondition.RangeOptions(gte=min_val)
+            ))
     
+    # Construct query filter
+    query_filter = Filter(must=conditions) if conditions else None
+    
+    # Execute search
     try:
-        results = qdrant_client.client.search(
+        results = qdrant_client.search(
             collection_name="steps",
-            query_vector=query_vector,
+            query_vector=req.query_vector,
             query_filter=query_filter,
-            limit=limit,
-            score_threshold=0.0,  # Return all results; caller thresholds
-            with_payload=True,
-            with_vectors=False  # Don't return full vector (save bandwidth)
+            limit=req.limit,
+            with_payload=True
         )
         
-        return SearchResult(
-            success=True,
-            results=[SearchHit(
-                step_id=hit.payload["step_id"],
-                trace_id=hit.payload["trace_id"],
-                similarity_score=hit.score,
-                role=hit.payload["role"],
-                domain=hit.payload["domain"],
-                text_version=hit.payload["text_version_bound"],
-                trace_title=hit.payload["trace_title"]
-            ) for hit in results],
-            query_count=len(results)
-        )
-        
-    except Exception as e:
-        logger.error(f"Search failed: {e}")
-        return SearchResult(success=False, error=str(e))
-```
-
-**Example Usage**:
-```python
-# Embed query text
-query_text = "How do I optimize database performance?"
-query_vector = embedding_model.encode(query_text).tolist()
-
-# Search with domain filter
-results = search_similar_steps(
-    qdrant_client,
-    query_vector=query_vector,
-    limit=10,
-    filters={"domain": "database"}
-)
-
-# Caller receives top-10 similar steps in 'database' domain
-for hit in results["results"]:
-    print(f"Trace {hit.trace_id}: {hit.similarity_score:.3f}")
-```
-
-### Query 2: Filtered Search by Domain
-
-```python
-def search_by_domain(qdrant_client: QdrantClient,
-                    domain: str,
-                    limit: int = 100) -> BrowseResult:
-    """
-    Retrieve all steps in a domain (for dataset exploration).
-    Returns step metadata without vectors.
-    """
-    try:
-        points = qdrant_client.client.scroll(
-            collection_name="steps",
-            scroll_filter=Filter(must=[
-                HasValueFilter(key="domain", value=domain)
-            ]),
-            limit=limit,
-            with_payload=True,
-            with_vectors=False
-        )
-        
-        return BrowseResult(
-            steps=[StepMetadata(**p.payload) for p, _ in points[0]],
-            total_count=len(points[0])
-        )
-        
-    except Exception as e:
-        logger.error(f"Browse by domain failed: {e}")
-        return BrowseResult(steps=[], error=str(e))
-```
-
-### Query 3: Batch Search
-
-```python
-def batch_search(qdrant_client: QdrantClient,
-                query_vectors: List[List[float]],
-                limit_per_query: int = 10) -> BatchSearchResult:
-    """
-    Efficient multi-query search (e.g., find similar steps for top-K reasoning chains).
-    Qdrant processes batch internally; better than sequential calls.
-    """
-    try:
-        results = qdrant_client.client.search_batch(
-            collection_name="steps",
-            requests=[SearchRequest(
-                vector=qv,
-                limit=limit_per_query,
-                with_payload=True
-            ) for qv in query_vectors]
-        )
-        
-        return BatchSearchResult(
-            batch_results=[
-                [SearchHit(
-                    step_id=hit.payload["step_id"],
-                    similarity_score=hit.score
-                ) for hit in batch_result]
-                for batch_result in results
-            ]
-        )
-        
-    except Exception as e:
-        logger.error(f"Batch search failed: {e}")
-        return BatchSearchResult(error=str(e))
-```
-
----
-
-## Update API: Version Management (FR-006a)
-
-### Operation: Invalidate Embeddings When Text Updates
-
-```python
-def invalidate_embedding(qdrant_client: QdrantClient,
-                        step_id: str) -> InvalidateResult:
-    """
-    Mark embedding as stale when contributor edits text in S3.
-    Called by text-versioning-api.md → storage-api.md → retrieval-api.md callback.
-    
-    Implementation: Set danger_* flags to -1.0 (sentinel for "needs re-embedding").
-    Re-embedding happens on-demand or batch during off-peak hours.
-    """
-    try:
-        # Update payload without re-computing vector
-        qdrant_client.client.set_payload(
-            collection_name="steps",
-            payload={
-                "danger_ambiguity": -1.0,  # Sentinel: re-embedding needed
-                "danger_adversarial": -1.0,
-                "text_version_bound": None,  # Unbound from text version
-                "stale_embedding": True,
-                "invalidated_at": datetime.now().isoformat()
-            },
-            points_selector=PointIdsList(
-                ids=[hash_to_int(step_id)]
+        # Transform to canonical response
+        hits = [
+            StepSearchHit(
+                step_id=result.payload.get("step_id"),
+                trace_id=result.payload.get("trace_id"),
+                role=result.payload.get("role"),
+                domain=result.payload.get("domain"),
+                danger_scores={
+                    "ambiguity": result.payload.get("danger_ambiguity", 0.0),
+                    "adversarial": result.payload.get("danger_adversarial", 0.0),
+                    "irreversibility": result.payload.get("danger_irreversibility", 0.0),
+                    "institutional": result.payload.get("danger_institutional", 0.0)
+                },
+                similarity=result.score  # COSINE distance [0, 1]
             )
+            for result in results
+        ]
+        
+        return StepSearchResponse(
+            hits=hits,
+            total=len(hits),
+            query_time_ms=0  # Qdrant doesn't expose this; estimate later
         )
-        
-        logger.info(f"Invalidated embedding for step {step_id}")
-        return InvalidateResult(success=True, step_id=step_id)
-        
-    except Exception as e:
-        logger.error(f"Invalidate embedding failed: {e}")
-        return InvalidateResult(success=False, error=str(e))
-```
-
-### Operation: Re-embed Single Step (On-Demand)
-
-```python
-def reembed_step(qdrant_client: QdrantClient,
-                step_id: str,
-                new_text: str,
-                embedding_model) -> ReembedResult:
-    """
-    Re-compute embedding after text update.
-    Called by background job or on-demand when querying stale steps.
-    """
-    try:
-        # Generate new vector
-        new_vector = embedding_model.encode(new_text).tolist()
-        
-        # Upsert with new vector
-        qdrant_client.client.upsert(
-            collection_name="steps",
-            points=[Point(
-                id=hash_to_int(step_id),
-                vector=new_vector,
-                payload={
-                    "stale_embedding": False,
-                    "embedding_updated_at": datetime.now().isoformat(),
-                    "danger_ambiguity": 0.0,  # Reset to recompute (Phase 2)
-                    "danger_adversarial": 0.0,
-                    "danger_irreversibility": 0.0,
-                    "danger_institutional": 0.0
-                }
-            )]
-        )
-        
-        return ReembedResult(success=True, step_id=step_id)
-        
-    except Exception as e:
-        logger.error(f"Re-embedding failed for step {step_id}: {e}")
-        return ReembedResult(success=False, error=str(e))
-```
-
-### Background Job: Re-embed Stale Steps
-
-```python
-def reembed_stale_steps(qdrant_client: QdrantClient,
-                       embedding_model,
-                       s3_client,
-                       batch_size: int = 1000,
-                       max_age_hours: int = 24) -> ReembedBatchResult:
-    """
-    Periodic background job to re-embed steps with stale embeddings.
-    Runs during off-peak hours; can be interrupted and resumed.
-    Pulls text from S3 and stores new vectors.
-    """
     
-    # Find stale embeddings
-    stale_points = qdrant_client.client.scroll(
-        collection_name="steps",
-        scroll_filter=Filter(must=[
-            HasValueFilter(key="stale_embedding", value=True)
-        ]),
-        limit=batch_size,
-        with_payload=True
+    except Exception as e:
+        logger.error(f"Step search failed: {e}")
+        return StepSearchResponse(hits=[], total=0, error=str(e))
+
+
+class StepSearchHit(BaseModel):
+    """Single search result"""
+    
+    step_id: str
+    trace_id: str
+    role: str
+    domain: str
+    danger_scores: Dict[str, float] = Field(
+        description="danger_ambiguity, adversarial, irreversibility, institutional"
     )
+    similarity: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Similarity score (COSINE: 1.0 = identical, 0.0 = opposite)"
+    )
+
+
+class StepSearchResponse(BaseModel):
+    """Response: ranked list of similar steps"""
     
-    reembedded = 0
-    failed = []
-    
-    for point, _ in stale_points[0]:
-        try:
-            step_id = point.payload["step_id"]
-            text_key = point.payload.get("text_key")  # Should be stored in payload
-            
-            if not text_key:
-                failed.append((step_id, "Missing text_key"))
-                continue
-            
-            # Retrieve text from S3
-            full_text = s3_client.get_object(text_key)
-            
-            # Re-embed
-            new_vector = embedding_model.encode(full_text).tolist()
-            
-            # Update Qdrant
-            qdrant_client.client.upsert(
-                collection_name="steps",
-                points=[Point(
-                    id=point.id,
-                    vector=new_vector,
-                    payload={
-                        "stale_embedding": False,
-                        "embedding_updated_at": datetime.now().isoformat()
+    hits: List[StepSearchHit] = Field(
+        description="Ranked by similarity (highest first)"
+    )
+    total: int = Field(
+        description="Number of hits returned"
+    )
+    error: Optional[str] = Field(
+        default=None,
+        description="Error message if search failed"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "hits": [
+                    {
+                        "step_id": "01J2K3L4M5N6O7P8Q9R0S1T2",
+                        "trace_id": "abc123-def456",
+                        "role": "observation",
+                        "domain": "ml",
+                        "danger_scores": {
+                            "ambiguity": 0.1,
+                            "adversarial": 0.0,
+                            "irreversibility": 0.05,
+                            "institutional": 0.2
+                        },
+                        "similarity": 0.89
                     }
-                )]
-            )
-            
-            reembedded += 1
-            
-        except Exception as e:
-            failed.append((step_id, str(e)))
-            logger.error(f"Failed to re-embed {step_id}: {e}")
-    
-    logger.info(f"Re-embedding batch: {reembedded} succeeded, {len(failed)} failed")
-    return ReembedBatchResult(
-        reembedded_count=reembedded,
-        failed_steps=failed,
-        batch_size=len(stale_points[0])
-    )
+                ],
+                "total": 1,
+                "error": None
+            }
+        }
 ```
 
----
-
-## Analytics & Maintenance
-
-### Collection Statistics
+### Query 2: Retrieve Pattern Recommendations
 
 ```python
-def get_collection_stats(qdrant_client: QdrantClient) -> CollectionStats:
-    """Health metrics for vector store"""
-    info = qdrant_client.client.get_collection("steps")
+class PatternSearchRequest(BaseModel):
+    """Request: find applicable patterns for current context"""
     
-    return CollectionStats(
-        point_count=info.points_count,
-        vector_count=info.vectors_count,
-        segments=info.config.params.vectors_size,
-        indexed=info.indexed_vectors_count if hasattr(info, "indexed_vectors_count") else None
+    query_vector: List[float] = Field(
+        ...,
+        description="Embedding of current FSM state + recent steps",
+        min_length=384,
+        max_length=384
     )
-```
+    
+    fsm_id: Optional[str] = Field(
+        default=None,
+        description="Active FSM (e.g., 'fsm_diagnose_fix')"
+    )
+    
+    current_state: Optional[str] = Field(
+        default=None,
+        description="Current FSM state (e.g., 'S6_evaluate')"
+    )
+    
+    limit: int = Field(
+        default=5,
+        ge=1,
+        le=50
+    )
 
-### Collection Maintenance
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "query_vector": [0.5, ...],
+                "fsm_id": "fsm_diagnose_fix",
+                "current_state": "S6_evaluate",
+                "limit": 5
+            }
+        }
 
-```python
-def optimize_collection(qdrant_client: QdrantClient):
-    """Optimize performance (compact segments, rebuild indexes)"""
+
+def search_patterns(
+    qdrant_client: QdrantClient,
+    req: PatternSearchRequest
+) -> PatternSearchResponse:
+    """
+    Find patterns applicable to current FSM + state.
+    Patterns embedding captures: template semantics + applicability constraints.
+    """
+    
+    conditions = []
+    
+    if req.fsm_id:
+        conditions.append(FieldCondition(
+            key="fsm_id",
+            match=MatchValue(value=req.fsm_id)
+        ))
+    
+    if req.current_state:
+        conditions.append(FieldCondition(
+            key="allowed_states",
+            match=MatchValue(value=req.current_state)
+        ))
+    
+    query_filter = Filter(must=conditions) if conditions else None
+    
     try:
-        qdrant_client.client.optimize_collection("steps")
-        logger.info("Optimized 'steps' collection")
+        results = qdrant_client.search(
+            collection_name="patterns",
+            query_vector=req.query_vector,
+            query_filter=query_filter,
+            limit=req.limit,
+            with_payload=True
+        )
+        
+        hits = [
+            PatternSearchHit(
+                pattern_id=result.payload.get("pattern_id"),
+                name=result.payload.get("name", "Unnamed"),
+                type=result.payload.get("type", "fsm_subpath"),
+                support=result.payload.get("quality_support", 0),
+                similarity=result.score
+            )
+            for result in results
+        ]
+        
+        return PatternSearchResponse(hits=hits, total=len(hits))
+    
     except Exception as e:
-        logger.warning(f"Collection optimization skipped: {e}")
+        logger.error(f"Pattern search failed: {e}")
+        return PatternSearchResponse(hits=[], total=0, error=str(e))
+
+
+class PatternSearchHit(BaseModel):
+    pattern_id: str
+    name: str
+    type: str
+    support: int = Field(description="Number of instances across corpus")
+    similarity: float
+
+
+class PatternSearchResponse(BaseModel):
+    hits: List[PatternSearchHit]
+    total: int
+    error: Optional[str] = None
 ```
 
 ---
 
-## Performance Targets (SR-001)
+## Pagination & Caching
 
-| Operation | Target | Validation |
-|-----------|--------|-----------|
-| Index single vector | < 10ms | Measure latency; verify upsert completes |
-| Search top-10 (no filter) | < 50ms | Measure latency on 1M+ points |
-| Search filtered (domain) | < 100ms | Verify pre-filter reduces candidate set |
-| Batch search (100 queries) | < 5 sec | All queries processed in parallel |
-| Re-embedding stale batch (1K) | < 60 sec | CPU-bound; acceptable for background job |
+### Cursor-Based Pagination
+
+```python
+class PaginatedStepSearchRequest(StepSearchRequest):
+    """Add cursor for large result sets"""
+    
+    cursor: Optional[str] = Field(
+        default=None,
+        description="Opaque cursor for fetching next page (from previous response)"
+    )
+
+
+class PaginatedStepSearchResponse(StepSearchResponse):
+    """Add cursor for large result sets"""
+    
+    next_cursor: Optional[str] = Field(
+        default=None,
+        description="Cursor to fetch next page (None = no more results)"
+    )
+    
+    has_more: bool = Field(
+        description="Whether more results exist"
+    )
+```
+
+### Caching Strategy (Phase 2)
+
+- Cache frequent queries (e.g., patterns for each FSM state) in Redis
+- TTL: 24 hours or until pattern corpus is updated
+- Key: `sha256(fsm_id + current_state)[:16]`
 
 ---
 
-## Error Codes
+## Integration Checklist
 
-| Code | Meaning | Handling |
-|------|---------|----------|
-| `COLLECTION_NOT_FOUND` | 'steps' collection doesn't exist | Call `init_collection()` |
-| `POINT_NOT_FOUND` | step_id not in collection | Retry ingestion for this step |
-| `INVALID_VECTOR_SIZE` | Vector dimension mismatch | Verify embedding model (should be 384) |
-| `PAYLOAD_EXCEEDED` | Payload too large | Externalize large fields or compress |
-| `SEARCH_TIMEOUT` | Query took too long | Increase timeout; verify indexes exist |
+- [ ] QdrantConnection class with health check
+- [ ] `ensure_collections()` creates all 3 collections with correct dimension
+- [ ] `index_step_embedding()` successfully upserts with correct payload schema
+- [ ] `search_similar_steps()` returns Steps filtered by metadata (domain, role, danger)
+- [ ] `search_patterns()` returns Patterns filtered by FSM applicability
+- [ ] Filter conditions use canonical enum values (role, domain, etc.)
+- [ ] Response schemas match canonical DangerScores structure
+- [ ] Error handling for connection failures, malformed queries
+- [ ] Unit tests for each search type (with mock Qdrant)
+- [ ] Integration test with real Qdrant (100+ steps) query performance < 200ms

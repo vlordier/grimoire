@@ -55,7 +55,7 @@
 - 1.2M: Expect ~85-90% unique across full dataset; composite ID strategy (SHA256 base + ULID suffix) enables efficient lookup
 
 **Validation**:
-- SC-001: 114K ingest < 5 min ✓ (if successful, proves ≥1.4K traces/min throughput)
+- SC-001: 1,000 traces ingest < 5 min ✓ (if successful, proves ≥200 traces/min throughput)
 - SC-001 extended: 1.2M ingest validates sustained 200+ traces/min throughput
 
 ---
@@ -184,7 +184,7 @@ s3://grimoire-text-store/
 
 **Decision** (clarification Q5): **FSM-adaptive depth with overlapping windows**
 
-**Window Sizes by FSM Type** (from FSM-10.md):
+**Window Sizes by FSM Type** (from [FSM Catalogue](../../docs/domain/fsm-catalogue.md)):
 - Hierarchical FSMs (Design/Decide, Clarify/Frame): depth 4-6 steps (captures full decision cycle)
 - Diagnostic FSMs (Diagnose/Fix): depth 2-3 steps (tight hypothesis-test loops)
 - Optimization loops: depth 5 (baseline → intervention → result)

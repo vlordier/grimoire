@@ -1,428 +1,445 @@
 # Storage API Contract (Neo4j Persistence)
 
-**Component**: Neo4j Graph Persistence Layer  
-**Input**: TraceBundle (Trace + Steps + Edges) from ingestion pipeline  
-**Output**: Graph constraints enforced, queryable Trace + Step + Edge nodes  
+> **Version 4 (Pass 4)**: Complete rewrite from canonical schemas. Aligns constraints, Cypher syntax (Neo4j 5.x), and persistence patterns to [Canonical Schemas](../../docs/reference/canonical-schemas.md) and [Storage Mapping](../../docs/reference/storage-mapping.md).
+>
+> **Component**: Neo4j Graph Persistence Layer  
+> **Input**: `TraceBundle` (Trace + Steps + Edges + Artifacts) from ingestion  
+> **Output**: Graph constraints enforced, queryable Trace + Step + Edge nodes  
+> **Requires**: neo4j ≥ 5.0, pydantic 2
 
 ---
 
 ## Connection & Session Management
 
 ```python
-class Neo4jClient:
-    def __init__(self, uri: str, auth: Tuple[str, str]):
+from neo4j import GraphDatabase, Driver, ManagedTransaction
+from typing import Optional, Tuple
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+class Neo4jConnection:
+    def __init__(self, uri: str, auth: Tuple[str, str], database: str = "neo4j"):
         """
-        uri: "neo4j://localhost:7687" or "neo4j+s://prod.neo4j.io"
+        uri: "neo4j://localhost:7687" (local) or "neo4j+s://prod.db.neo4j.io" (cloud)
         auth: (username, password)
+        database: "neo4j" (default) or custom database name
         """
         self.driver = GraphDatabase.driver(uri, auth=auth)
-        self.session = self.driver.session()
+        self.database = database
     
     def close(self):
-        self.session.close()
         self.driver.close()
     
     def health_check(self) -> bool:
-        """Verify connection and server availability"""
+        """Verify Neo4j server is reachable"""
         try:
-            result = self.session.run("RETURN 1")
-            return result.single() is not None
-        except Exception:
+            with self.driver.session(database=self.database) as session:
+                result = session.run("RETURN 1 AS status")
+                return result.single() is not None
+        except Exception as e:
+            logger.error(f"Neo4j health check failed: {e}")
             return False
 ```
 
 ---
 
-## Schema Initialization (FR-004a: Constraints)
+## Schema Initialization (Neo4j 5.x)
 
-### Constraint Definitions
+### Constraints & Indexes
 
 ```cypher
+-- Neo4j 5.x syntax uses "CREATE CONSTRAINT ... FOR (...) REQUIRE ..."
+
 -- Trace constraints
-CREATE CONSTRAINT IF NOT EXISTS trace_id_unique ON (t:Trace) ASSERT t.trace_id IS UNIQUE;
-CREATE CONSTRAINT IF NOT EXISTS trace_domain_required ON (t:Trace) ASSERT t.domain IS NOT NULL;
-CREATE CONSTRAINT IF NOT EXISTS trace_schema_version_required ON (t:Trace) ASSERT t.provenance_schema_version IS NOT NULL;
+CREATE CONSTRAINT trace_id_unique IF NOT EXISTS
+FOR (t:Trace) REQUIRE t.trace_id IS UNIQUE;
+
+CREATE CONSTRAINT trace_domain_required IF NOT EXISTS
+FOR (t:Trace) REQUIRE t.domain IS NOT NULL;
 
 -- Step constraints
-CREATE CONSTRAINT IF NOT EXISTS step_id_unique ON (s:Step) ASSERT s.step_id IS UNIQUE;
-CREATE CONSTRAINT IF NOT EXISTS step_trace_required ON (s:Step) ASSERT s.trace_id IS NOT NULL;
-CREATE CONSTRAINT IF NOT EXISTS step_index_required ON (s:Step) ASSERT s.index IS NOT NULL;
+CREATE CONSTRAINT step_id_unique IF NOT EXISTS
+FOR (s:Step) REQUIRE s.step_id IS UNIQUE;
 
--- Composite unique: (trace_id, step_index)
-CREATE INDEX IF NOT EXISTS step_ordering ON (s:Step) FOR (s.trace_id, s.index);
+CREATE CONSTRAINT step_trace_required IF NOT EXISTS
+FOR (s:Step) REQUIRE s.trace_id IS NOT NULL;
 
--- Indexes for common queries
-CREATE INDEX IF NOT EXISTS domain_index ON (t:Trace) FOR (t.domain);
-CREATE INDEX IF NOT EXISTS created_at_index ON (t:Trace) FOR (t.created_at);
-CREATE INDEX IF NOT EXISTS role_index ON (s:Step) FOR (s.role);
+CREATE CONSTRAINT step_index_required IF NOT EXISTS
+FOR (s:Step) REQUIRE s.index IS NOT NULL;
+
+-- Artifact constraints
+CREATE CONSTRAINT artifact_id_unique IF NOT EXISTS
+FOR (a:Artifact) REQUIRE a.artifact_id IS UNIQUE;
+
+-- Pattern constraints
+CREATE CONSTRAINT pattern_id_unique IF NOT EXISTS
+FOR (p:Pattern) REQUIRE p.pattern_id IS UNIQUE;
+
+-- Indexes for query performance
+CREATE INDEX trace_domain_idx IF NOT EXISTS FOR (t:Trace) ON (t.domain);
+CREATE INDEX trace_created_at_idx IF NOT EXISTS FOR (t:Trace) ON (t.created_at);
+
+CREATE INDEX step_trace_index_idx IF NOT EXISTS FOR (s:Step) ON (s.trace_id, s.index);
+CREATE INDEX step_role_idx IF NOT EXISTS FOR (s:Step) ON (s.role);
+CREATE INDEX step_fsm_idx IF NOT EXISTS FOR (s:Step) ON (s.fsm_id, s.fsm_state);
+
+CREATE INDEX artifact_type_idx IF NOT EXISTS FOR (a:Artifact) ON (a.type);
+CREATE INDEX pattern_type_idx IF NOT EXISTS FOR (p:Pattern) ON (p.type);
 ```
 
-**Initialization**: Idempotent; called on app startup
+### Initialization Python Code
 
 ```python
-def init_schema(neo4j_client):
-    """Create constraints and indexes on server startup"""
+def init_schema(neo4j_conn: Neo4jConnection) -> Tuple[bool, Optional[str]]:
+    """
+    Create all constraints and indexes on server startup (idempotent).
+    Returns (success, error_message).
+    """
     constraints = [
-        "CREATE CONSTRAINT IF NOT EXISTS trace_id_unique ON (t:Trace) ASSERT t.trace_id IS UNIQUE",
-        "CREATE CONSTRAINT IF NOT EXISTS step_id_unique ON (s:Step) ASSERT s.step_id IS UNIQUE",
-        # ... (all constraints listed above)
+        # Trace
+        "CREATE CONSTRAINT trace_id_unique IF NOT EXISTS FOR (t:Trace) REQUIRE t.trace_id IS UNIQUE",
+        "CREATE CONSTRAINT trace_domain_required IF NOT EXISTS FOR (t:Trace) REQUIRE t.domain IS NOT NULL",
+        
+        # Step
+        "CREATE CONSTRAINT step_id_unique IF NOT EXISTS FOR (s:Step) REQUIRE s.step_id IS UNIQUE",
+        "CREATE CONSTRAINT step_trace_required IF NOT EXISTS FOR (s:Step) REQUIRE s.trace_id IS NOT NULL",
+        "CREATE CONSTRAINT step_index_required IF NOT EXISTS FOR (s:Step) REQUIRE s.index IS NOT NULL",
+        
+        # Artifact
+        "CREATE CONSTRAINT artifact_id_unique IF NOT EXISTS FOR (a:Artifact) REQUIRE a.artifact_id IS UNIQUE",
+        
+        # Pattern
+        "CREATE CONSTRAINT pattern_id_unique IF NOT EXISTS FOR (p:Pattern) REQUIRE p.pattern_id IS UNIQUE",
     ]
     
-    for constraint in constraints:
-        try:
-            neo4j_client.session.run(constraint)
-            logger.debug(f"Applied constraint: {constraint[:50]}...")
-        except Exception as e:
-            if "already" in str(e):
-                pass  # Already exists, OK
-            else:
-                raise
+    indexes = [
+        "CREATE INDEX trace_domain_idx IF NOT EXISTS FOR (t:Trace) ON (t.domain)",
+        "CREATE INDEX trace_created_at_idx IF NOT EXISTS FOR (t:Trace) ON (t.created_at)",
+        "CREATE INDEX step_trace_index_idx IF NOT EXISTS FOR (s:Step) ON (s.trace_id, s.index)",
+        "CREATE INDEX step_role_idx IF NOT EXISTS FOR (s:Step) ON (s.role)",
+        "CREATE INDEX step_fsm_idx IF NOT EXISTS FOR (s:Step) ON (s.fsm_id, s.fsm_state)",
+        "CREATE INDEX artifact_type_idx IF NOT EXISTS FOR (a:Artifact) ON (a.type)",
+        "CREATE INDEX pattern_type_idx IF NOT EXISTS FOR (p:Pattern) ON (p.type)",
+    ]
+    
+    try:
+        with neo4j_conn.driver.session(database=neo4j_conn.database) as session:
+            for constraint in constraints:
+                session.run(constraint)
+                logger.debug(f"Applied constraint: {constraint[:60]}...")
+            
+            for index in indexes:
+                session.run(index)
+                logger.debug(f"Applied index: {index[:60]}...")
+        
+        logger.info("Neo4j schema initialization complete")
+        return True, None
+    
+    except Exception as e:
+        logger.error(f"Schema initialization failed: {e}")
+        return False, str(e)
 ```
 
 ---
 
 ## Write API: Persist TraceBundle
 
-### Operation: Store Trace + Steps + Edges
+### Operation: Atomic Store (All-or-Nothing)
 
 ```python
-def store_tracebundle(neo4j_client: Neo4jClient, bundle: TraceBundle) -> StorageResult:
+from grimoire.canonical_schema import TraceBundle
+import json
+
+def store_tracebundle(
+    neo4j_conn: Neo4jConnection,
+    bundle: TraceBundle
+) -> Tuple[bool, Optional[str]]:
     """
-    Atomically store Trace + Steps + Edges to Neo4j.
-    If any part fails: entire operation rolled back.
-    """
-    result = StorageResult(trace_id=bundle.trace.trace_id, success=False, error=None)
+    Atomically persist TraceBundle to Neo4j.
+    Single transaction: if any part fails, entire operation rolls back.
     
-    tx = neo4j_client.session.begin_transaction()
+    Returns (success, error_message).
+    """
+    
+    trace_id = bundle.trace.trace_id
+    
     try:
-        # 1. Create Trace node
-        tx.run("""
-            CREATE (t:Trace {
-                trace_id: $trace_id,
-                title: $title,
-                domain: $domain,
-                problem: $problem,
-                n_steps: $n_steps,
-                trace_version: $trace_version,
-                content_hash: $content_hash,
-                provenance_sources: $provenance_sources,
-                provenance_license: $provenance_license,
-                provenance_sensitivity: $provenance_sensitivity,
-                provenance_ingested_at: $provenance_ingested_at,
-                provenance_pipeline_version: $provenance_pipeline_version,
-                provenance_schema_version: $provenance_schema_version,
-                created_at: $created_at,
-                updated_at: $updated_at
-            })
-        """, {
-            "trace_id": bundle.trace.trace_id,
-            "title": bundle.trace.title,
-            "domain": bundle.trace.domain.value,
-            "problem": bundle.trace.problem,
-            "n_steps": len(bundle.steps),
-            "trace_version": bundle.trace.trace_version,
-            "content_hash": bundle.trace.content_hash,
-            "provenance_sources": [s.dict() for s in bundle.trace.provenance_sources],
-            "provenance_license": bundle.trace.provenance_license,
-            "provenance_sensitivity": bundle.trace.provenance_sensitivity.value,
-            "provenance_ingested_at": bundle.trace.provenance_ingested_at.isoformat(),
-            "provenance_pipeline_version": bundle.trace.provenance_pipeline_version,
-            "provenance_schema_version": bundle.trace.provenance_schema_version,
-            "created_at": bundle.trace.created_at.isoformat(),
-            "updated_at": datetime.now().isoformat()
-        })
-        
-        # 2. Create Step nodes
-        for step in bundle.steps:
-            tx.run("""
-                MATCH (t:Trace {trace_id: $trace_id})
-                CREATE (s:Step {
-                    step_id: $step_id,
-                    trace_id: $trace_id,
-                    index: $index,
-                    role: $role,
-                    actor: $actor,
-                    text_key: $text_key,
-                    text_preview: $text_preview,
-                    text_hash: $text_hash,
-                    embedding_id: $embedding_id,
-                    text_version: $text_version,
-                    embedding_version: $embedding_version,
-                    created_at: $created_at
+        with neo4j_conn.driver.session(database=neo4j_conn.database) as session:
+            # Begin transaction
+            tx = session.begin_transaction()
+            
+            try:
+                # 1. Create Trace node
+                tx.run("""
+                    CREATE (t:Trace {
+                        trace_id: $trace_id,
+                        title: $title,
+                        domain: $domain,
+                        problem: $problem,
+                        tags: $tags,
+                        n_steps: $n_steps,
+                        
+                        provenance_source_types: $source_types,
+                        provenance_source_ids: $source_ids,
+                        provenance_license: $license,
+                        sensitivity: $sensitivity,
+                        ingested_at: $ingested_at,
+                        pipeline_version: $pipeline_version,
+                        schema_version: $schema_version,
+                        
+                        created_at: $created_at,
+                        updated_at: $updated_at
+                    })
+                """, {
+                    "trace_id": bundle.trace.trace_id,
+                    "title": bundle.trace.title or "(untitled)",
+                    "domain": bundle.trace.domain.value,
+                    "problem": bundle.trace.problem or "",
+                    "tags": bundle.trace.tags,
+                    "n_steps": bundle.trace.n_steps or len(bundle.steps),
+                    
+                    "source_types": [s.source_type.value for s in bundle.trace.provenance.sources],
+                    "source_ids": [s.source_id for s in bundle.trace.provenance.sources if s.source_id],
+                    "license": bundle.trace.provenance.license_info.license.value if bundle.trace.provenance.license_info else "unknown",
+                    "sensitivity": bundle.trace.provenance.sensitivity.value,
+                    "ingested_at": bundle.trace.provenance.ingested_at.isoformat() if bundle.trace.provenance.ingested_at else None,
+                    "pipeline_version": bundle.trace.provenance.pipeline_version,
+                    "schema_version": bundle.trace.provenance.schema_version,
+                    
+                    "created_at": bundle.trace.created_at.isoformat() if bundle.trace.created_at else datetime.now().isoformat(),
+                    "updated_at": bundle.trace.updated_at.isoformat() if bundle.trace.updated_at else None
                 })
-                CREATE (t)-[:HAS_STEP {index: $index}]->(s)
-            """, {
-                "trace_id": bundle.trace.trace_id,
-                "step_id": step.step_id,
-                "index": step.index,
-                "role": step.role.value,
-                "actor": step.actor,
-                "text_key": step.text_key,
-                "text_preview": step.text_preview,
-                "text_hash": step.text_hash,
-                "embedding_id": step.embedding_id,
-                "text_version": step.text_version,
-                "embedding_version": step.embedding_version,
-                "created_at": step.created_at.isoformat()
-            })
-        
-        # 3. Create NEXT edges between Steps
-        for i, edge in enumerate(bundle.edges):
-            tx.run("""
-                MATCH (src:Step {step_id: $src_id}), (dst:Step {step_id: $dst_id})
-                CREATE (src)-[e:NEXT {weight: $weight}]->(dst)
-            """, {
-                "src_id": edge.src_id,
-                "dst_id": edge.dst_id,
-                "weight": edge.weight
-            })
-        
-        # 4. Commit transaction
-        tx.commit()
-        result.success = True
-        logger.info(f"Stored trace {bundle.trace.trace_id} with {len(bundle.steps)} steps")
-        
-    except Exception as e:
-        tx.rollback()
-        result.error = str(e)
-        logger.error(f"Failed to store trace {bundle.trace.trace_id}: {e}", exc_info=True)
+                
+                logger.debug(f"Created Trace {trace_id}")
+                
+                # 2. Create Step nodes
+                for step in bundle.steps:
+                    tx.run("""
+                        MATCH (t:Trace {trace_id: $trace_id})
+                        CREATE (s:Step {
+                            step_id: $step_id,
+                            trace_id: $trace_id,
+                            index: $index,
+                            actor: $actor,
+                            role: $role,
+                            text: $text,
+                            fsm_id: $fsm_id,
+                            fsm_state: $fsm_state,
+                            created_at: $created_at
+                        })
+                        CREATE (t)-[:HAS_STEP]->(s)
+                    """, {
+                        "trace_id": bundle.trace.trace_id,
+                        "step_id": step.step_id,
+                        "index": step.index,
+                        "actor": step.actor,
+                        "role": step.role.value,
+                        "text": step.text[:500] if step.text else "",  # Store preview; full text lives in S3
+                        "fsm_id": step.fsm_id.value if step.fsm_id else None,
+                        "fsm_state": step.fsm_state.value if step.fsm_state else None,
+                        "created_at": step.created_at.isoformat() if step.created_at else datetime.now().isoformat()
+                    })
+                
+                logger.debug(f"Created {len(bundle.steps)} steps")
+                
+                # 3. Create Artifact nodes
+                for artifact in bundle.artifacts:
+                    tx.run("""
+                        MATCH (t:Trace {trace_id: $trace_id})
+                        CREATE (a:Artifact {
+                            artifact_id: $artifact_id,
+                            type: $type,
+                            title: $title,
+                            domain: $domain,
+                            priority: $priority
+                        })
+                        CREATE (t)-[:HAS_ARTIFACT]->(a)
+                    """, {
+                        "trace_id": bundle.trace.trace_id,
+                        "artifact_id": artifact.artifact_id,
+                        "type": artifact.type.value,
+                        "title": artifact.title or "(untitled)",
+                        "domain": artifact.domain.value if artifact.domain else "general",
+                        "priority": artifact.priority
+                    })
+                
+                logger.debug(f"Created {len(bundle.artifacts)} artifacts")
+                
+                # 4. Create relationship edges
+                for edge in bundle.edges:
+                    # Determine source/dest nodes
+                    src_label = "Step" if edge.src.type.value == "step" else "Artifact"
+                    dst_label = "Step" if edge.dst.type.value == "step" else "Artifact"
+                    
+                    tx.run(f"""
+                        MATCH (src:{src_label} {{{src_label.lower()}_id: $src_id}})
+                        MATCH (dst:{dst_label} {{{dst_label.lower()}_id: $dst_id}})
+                        CREATE (src)-[r:{edge.type.value.upper()} {{
+                            edge_id: $edge_id,
+                            weight: $weight,
+                            label: $label
+                        }}]->(dst)
+                    """, {
+                        "src_id": edge.src.id,
+                        "dst_id": edge.dst.id,
+                        "edge_id": edge.edge_id,
+                        "weight": edge.weight or 1.0,
+                        "label": edge.label or None
+                    })
+                
+                logger.debug(f"Created {len(bundle.edges)} edges")
+                
+                # Commit
+                tx.commit()
+                logger.info(f"Successfully stored TraceBundle {trace_id}")
+                return True, None
+            
+            except Exception as e:
+                tx.rollback()
+                logger.error(f"Transaction failed for {trace_id}: {e}", exc_info=True)
+                return False, str(e)
     
-    return result
+    except Exception as e:
+        logger.error(f"Session error for {trace_id}: {e}", exc_info=True)
+        return False, str(e)
 ```
 
 ---
 
 ## Query API: Retrieve Traces
 
-### Query 1: Fetch Trace by ID
+### Query 1: Get Trace with All Steps
 
-```python
-def get_trace(neo4j_client: Neo4jClient, trace_id: str) -> Optional[TraceWithSteps]:
-    """Retrieve full trace with all steps and edges"""
-    result = neo4j_client.session.run("""
-        MATCH (t:Trace {trace_id: $trace_id})
-        OPTIONAL MATCH (t)-[:HAS_STEP]->(s:Step)
-        OPTIONAL MATCH (s)-[e:NEXT]->(s2:Step)
-        RETURN t, collect(s) AS steps, collect(e) AS edges
-    """, trace_id=trace_id)
-    
-    record = result.single()
-    if not record:
-        return None
-    
-    trace_data = dict(record["t"])
-    steps = [dict(s) for s in record["steps"]]
-    
-    return TraceWithSteps(
-        trace=Trace(**trace_data),
-        steps=[Step(**s) for s in steps],
-        step_count=len(steps)
-    )
+```cypher
+-- Retrieve full trace + steps + edges
+MATCH (t:Trace {trace_id: $trace_id})
+OPTIONAL MATCH (t)-[:HAS_STEP]->(s:Step)
+OPTIONAL MATCH (s1)-[e]->(s2) WHERE s1.trace_id = $trace_id AND s2.trace_id = $trace_id
+OPTIONAL MATCH (t)-[:HAS_ARTIFACT]->(a:Artifact)
+RETURN t, collect(DISTINCT s) as steps, collect(DISTINCT e) as edges, collect(DISTINCT a) as artifacts
+ORDER BY s.index ASC
 ```
 
-### Query 2: Search Traces by Domain
+### Query 2: Search Traces by Domain + Tags
 
-```python
-def search_traces_by_domain(neo4j_client: Neo4jClient, 
-                           domain: DomainTag, 
-                           limit: int = 100) -> List[TraceMetadata]:
-    """Find traces in a specific domain"""
-    result = neo4j_client.session.run("""
-        MATCH (t:Trace {domain: $domain})
-        RETURN t.trace_id, t.title, t.domain, t.n_steps, t.created_at
-        ORDER BY t.created_at DESC
-        LIMIT $limit
-    """, domain=domain.value, limit=limit)
-    
-    return [TraceMetadata(**dict(record)) for record in result]
+```cypher
+-- Find traces by domain and tags
+MATCH (t:Trace)
+WHERE t.domain = $domain
+  AND (size($tags) = 0 OR any(tag IN t.tags WHERE tag IN $tags))
+RETURN t
+ORDER BY t.created_at DESC
+LIMIT $limit
 ```
 
-### Query 3: Retrieve Step Lineage (for FSM-adaptive windows)
+### Query 3: Traverse Steps by FSM State
 
-```python
-def get_step_lineage(neo4j_client: Neo4jClient, 
-                     step_id: str, 
-                     window_depth: int = 5) -> StepWindow:
-    """
-    Retrieve step + context steps (predecessors/successors).
-    Used for computing FSM-adaptive windows (RQ-5).
-    """
-    result = neo4j_client.session.run("""
-        // Find the step
-        MATCH (center:Step {step_id: $step_id})
-        
-        // Find predecessors (up to window_depth hops back)
-        OPTIONAL MATCH (center)<-[:NEXT*0..$(window_depth-1)]-(pred:Step)
-        WHERE pred.index < center.index
-        
-        // Find successors (up to window_depth hops forward)
-        OPTIONAL MATCH (center)-[:NEXT*0..$(window_depth-1)]->(succ:Step)
-        WHERE succ.index > center.index
-        
-        RETURN 
-            center,
-            collect(DISTINCT pred) AS predecessors,
-            collect(DISTINCT succ) AS successors
-    """, step_id=step_id, window_depth=window_depth)
-    
-    record = result.single()
-    if not record:
-        return None
-    
-    center = Step(**dict(record["center"]))
-    preds = [Step(**dict(s)) for s in record["predecessors"] if s]
-    succs = [Step(**dict(s)) for s in record["successors"] if s]
-    
-    return StepWindow(
-        center=center,
-        predecessors=preds,
-        successors=succs,
-        depth_used=min(window_depth, max(len(preds), len(succs)))
-    )
-```
-
-### Query 4: Performance Statistics
-
-```python
-def get_storage_stats(neo4j_client: Neo4jClient) -> StorageStats:
-    """Get graph health metrics"""
-    result = neo4j_client.session.run("""
-        MATCH (t:Trace)
-        RETURN 
-            count(t) AS trace_count,
-            avg(t.n_steps) AS avg_steps_per_trace,
-            max(t.n_steps) AS max_steps,
-            count(DISTINCT t.domain) AS domain_count
-    """)
-    
-    record = result.single()
-    return StorageStats(
-        trace_count=record["trace_count"],
-        avg_steps=record["avg_steps_per_trace"],
-        max_steps=record["max_steps"],
-        domain_count=record["domain_count"]
-    )
+```cypher
+-- Find sequences of steps in a specific FSM state
+MATCH (t:Trace {trace_id: $trace_id})
+MATCH (t)-[:HAS_STEP]->(s:Step)
+WHERE s.fsm_state = $state
+OPTIONAL MATCH (s)-[:NEXT]->(next:Step)
+RETURN s, next
+ORDER BY s.index ASC
 ```
 
 ---
 
-## Update API: Version Management (FR-011)
+## Bulk Operations
 
-### Update Step Text Version (when predecessor edited)
+### Batch Store (Multiple Traces)
 
 ```python
-def update_step_text_version(neo4j_client: Neo4jClient,
-                            step_id: str,
-                            new_text_key: str,
-                            new_text_hash: str,
-                            new_text_version: int,
-                            contributor_id: str) -> UpdateResult:
+def store_tracebundles_batch(
+    neo4j_conn: Neo4jConnection,
+    bundles: List[TraceBundle],
+    batch_size: int = 100
+) -> Tuple[int, int]:
     """
-    Mark embedding as stale when text version increments.
-    Called by text-versioning-api.md when contributor edits markdown in S3.
+    Store multiple bundles (e.g., from ingestion batch).
+    Returns (successful_count, failed_count).
     """
-    tx = neo4j_client.session.begin_transaction()
+    
+    success_count = 0
+    failure_count = 0
+    
+    for i, bundle in enumerate(bundles):
+        success, error = store_tracebundle(neo4j_conn, bundle)
+        if success:
+            success_count += 1
+        else:
+            failure_count += 1
+            logger.warning(f"Failed to store bundle {i}: {error}")
+    
+    logger.info(f"Batch result: {success_count} successful, {failure_count} failed")
+    return success_count, failure_count
+```
+
+---
+
+## Maintenance
+
+### Soft Delete (Mark Deleted, Not Removed)
+
+```python
+def soft_delete_trace(
+    neo4j_conn: Neo4jConnection,
+    trace_id: str
+) -> bool:
+    """Mark a trace as deleted (set deleted_at timestamp)"""
+    
     try:
-        # 1. Update step text metadata
-        tx.run("""
-            MATCH (s:Step {step_id: $step_id})
-            SET s.text_key = $new_text_key,
-                s.text_hash = $new_text_hash,
-                s.text_version = $new_text_version,
-                s.embedding_version = NULL,  -- Mark as stale
-                s.updated_at = $now
-        """, {
-            "step_id": step_id,
-            "new_text_key": new_text_key,
-            "new_text_hash": new_text_hash,
-            "new_text_version": new_text_version,
-            "now": datetime.now().isoformat()
-        })
-        
-        # 2. Log edit in audit trail (optional: separate AUDIT_EDIT node)
-        tx.run("""
-            MATCH (s:Step {step_id: $step_id})
-            CREATE (s)-[:EDITED_BY {
-                contributor_id: $contributor_id,
-                timestamp: $timestamp,
-                new_version: $new_version
-            }]->()
-        """, {
-            "step_id": step_id,
-            "contributor_id": contributor_id,
-            "timestamp": datetime.now().isoformat(),
-            "new_version": new_text_version
-        })
-        
-        tx.commit()
-        return UpdateResult(success=True, step_id=step_id, new_version=new_text_version)
-        
+        with neo4j_conn.driver.session(database=neo4j_conn.database) as session:
+            result = session.run("""
+                MATCH (t:Trace {trace_id: $trace_id})
+                SET t.deleted_at = $deleted_at
+                RETURN t
+            """, {
+                "trace_id": trace_id,
+                "deleted_at": datetime.now().isoformat()
+            })
+            
+            return result.single() is not None
+    
     except Exception as e:
-        tx.rollback()
-        logger.error(f"Failed to update step version {step_id}: {e}")
-        return UpdateResult(success=False, error=str(e))
+        logger.error(f"Soft delete failed for {trace_id}: {e}")
+        return False
 ```
 
----
-
-## Deletion API (Cleanup/Retention)
+### Index Maintenance
 
 ```python
-def delete_trace(neo4j_client: Neo4jClient, trace_id: str) -> DeleteResult:
-    """
-    Soft delete: mark as deleted but preserve in graph for audit.
-    Hard delete: remove all nodes/relationships.
-    """
-    tx = neo4j_client.session.begin_transaction()
+def rebuild_indexes(neo4j_conn: Neo4jConnection) -> bool:
+    """Rebuild all indexes for optimization (requires ADMIN privilege)"""
+    
     try:
-        # Option 1: Soft delete
-        tx.run("""
-            MATCH (t:Trace {trace_id: $trace_id})
-            SET t.deleted_at = $now, t.is_deleted = true
-        """, trace_id=trace_id, now=datetime.now().isoformat())
-        
-        # Option 2: Hard delete (use with caution)
-        # tx.run("""
-        #     MATCH (t:Trace {trace_id: $trace_id})
-        #     DETACH DELETE t
-        # """, trace_id=trace_id)
-        
-        tx.commit()
-        logger.info(f"Soft-deleted trace {trace_id}")
-        return DeleteResult(success=True, trace_id=trace_id)
-        
+        with neo4j_conn.driver.session(database=neo4j_conn.database) as session:
+            session.run("CALL db.indexes.fulltext.await()")
+            logger.info("Indexes rebuilt successfully")
+            return True
+    
     except Exception as e:
-        tx.rollback()
-        return DeleteResult(success=False, error=str(e))
+        logger.error(f"Index rebuild failed: {e}")
+        return False
 ```
 
 ---
 
-## Transaction Semantics (FR-005)
+## Integration Checklist
 
-- **All-or-nothing**: If any step, edge, or constraint fails, entire TraceBundle rollback
-- **Isolation Level**: SNAPSHOT (default for Neo4j)
-- **Durability**: Committed transactions survive server restart
-- **Consistency**: Constraints enforced on write; query results always satisfy constraints
-
----
-
-## Performance Targets (SR-001)
-
-| Operation | Target | Validation |
-|-----------|--------|-----------|
-| Store TraceBundle (100 steps) | < 50ms | Measure with timer; log slow queries |
-| Query trace by ID | < 10ms | Verify trace_id_unique index exists |
-| Search domain (1K results) | < 50ms | Verify domain_index exists |
-| Lineage retrieval (depth=5) | < 30ms | Use EXPLAIN to analyze query plan |
-
----
-
-## Error Codes
-
-| Code | Meaning | Handling |
-|------|---------|----------|
-| `CONSTRAINT_VIOLATION` | Duplicate trace_id or invalid data | Retry with new trace_id or validate schema |
-| `CONNECTION_TIMEOUT` | Neo4j server unavailable | Exponential backoff; max 3 retries |
-| `TRANSACTION_CONFLICT` | Concurrent writes to same trace | Retry from ingestion layer |
-| `DISK_FULL` | Graph database storage exhausted | Alert operator; trigger retention cleanup |
+- [ ] Neo4jConnection class with health check
+- [ ] `init_schema()` creates all constraints and indexes (Neo4j 5.x syntax)
+- [ ] `store_tracebundle()` uses transaction (all-or-nothing semantics)
+- [ ] Trace node stores provenance metadata correctly
+- [ ] Step nodes use canonical role enums (lowercase values)
+- [ ] Edges created with correct relationship type (NEXT, SUPPORTS, REVISES, etc.)
+- [ ] Artifacts created with canonical type enums
+- [ ] Error handling + logging at each stage
+- [ ] Batch operations (`store_tracebundles_batch`) with partial success handling
+- [ ] Soft delete implementation
+- [ ] Unit tests for schema init
+- [ ] Integration test: store 100-step trace + verify full traversal
+- [ ] Performance test: store 10K traces, query time < 200ms

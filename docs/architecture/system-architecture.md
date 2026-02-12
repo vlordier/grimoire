@@ -1,6 +1,8 @@
----
+# System Architecture
 
-# High-Level Technical Architecture (Boxes + Flows)
+> **See also:** [Capability Requirements](capability-requirements.md) · [Build Plan](build-plan.md) · [Danger Classification](../domain/danger-classification.md) · [FSM Catalogue](../domain/fsm-catalogue.md) · [Canonical Schemas](../reference/canonical-schemas.md) · [Pattern Detection & Pipeline](../reference/pattern-detection-and-pipeline.md)
+
+---
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -49,7 +51,7 @@
 │     • Institutional                                      │
 │                                                          │
 │  2) FSM Router                                           │
-│     • Selects one of ~10 universal FSMs                  │
+│     • Selects one of 10 universal FSMs                   │
 │                                                          │
 │  3) Transition Guards                                    │
 │     • Block unsafe execute/decide steps                  │

@@ -94,7 +94,7 @@ docker run -d \
   --name grimoire-qdrant \
   -p 6333:6333 \
   -p 6334:6334 \
-  qdrant/qdrant:v0.11.6
+  qdrant/qdrant:v1.7.4
 
 # Wait for startup
 sleep 5
@@ -298,7 +298,7 @@ python -m src.validation.success_criteria
 # Output:
 # [SUCCESS CRITERIA VALIDATION]
 # 
-# SC-001: Ingest traces ≥1K/min? 
+# SC-001: Ingest traces ≥200/min? 
 #   Actual: 22.3 traces/min [FAIL] (target: ≥200)
 #   Note: Single-instance local ≠ production. Expected on laptop.
 # 

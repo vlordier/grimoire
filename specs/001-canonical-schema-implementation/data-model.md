@@ -16,7 +16,7 @@ Trace (root entity: problem + thoughts)
 Supporting:
   ├── Embedding (vector + version binding)
   ├── StepWindow (FSM-adaptive context for reasoning)
-  └── DomainTag, StepRole, SensitivityLevel (enums)
+  └── DomainTag, StepRole, Sensitivity (enums)
 ```
 
 ---
@@ -28,51 +28,54 @@ from enum import Enum
 from typing import Literal
 
 class DomainTag(str, Enum):
-    """Problem domain classification"""
+    """Problem domain classification — aligned to canonical schema"""
     GENERAL = "general"
-    MATHEMATICS = "mathematics"
-    PHYSICS = "physics"
-    CHEMISTRY = "chemistry"
-    BIOLOGY = "biology"
-    COMPUTER_SCIENCE = "cs"
-    ENGINEERING = "engineering"
-    MEDICINE = "medicine"
-    PHILOSOPHY = "philosophy"
-    HISTORY = "history"
-    ECONOMICS = "economics"
-    LAW = "law"
-    OTHER = "other"
+    SOFTWARE = "software"
+    ML = "ml"
+    DATA = "data"
+    SECURITY = "security"
+    PRODUCT = "product"
+    LEGAL = "legal"
+    HEALTH = "health"
+    FINANCE = "finance"
 
 class StepRole(str, Enum):
-    """Semantic role of reasoning step"""
-    GOAL = "goal"                    # Problem statement
-    QUESTION = "question"            # Clarifying question
-    HYPOTHESIS = "hypothesis"        # Proposed approach
-    OBSERVATION = "observation"      # New information/reasoning
-    CONSTRAINT = "constraint"        # Limitation discovered
-    CRITIQUE = "critique"            # Self-reflection/review
-    OPTIMIZATION = "optimization"    # Improvement iteration
-    ANSWER = "answer"               # Final solution
-    EXAMPLE = "example"             # Illustrative case
-    DIAGNOSTIC = "diagnostic"        # Debug/error analysis
+    """Semantic role of reasoning step — aligned to canonical schema"""
+    GOAL = "goal"
+    QUESTION = "question"
+    PLAN = "plan"
+    ACTION = "action"
+    TOOL_CALL = "tool_call"
+    OBSERVATION = "observation"
+    CRITIQUE = "critique"
+    REVISION = "revision"
+    DECISION = "decision"
+    VERIFICATION = "verification"
+    SUMMARY = "summary"
     OTHER = "other"
 
-class SensitivityLevel(str, Enum):
-    """Data sensitivity classification"""
+class Sensitivity(str, Enum):
+    """Data sensitivity classification — aligned to canonical schema"""
     PUBLIC = "public"
     INTERNAL = "internal"
     CONFIDENTIAL = "confidential"
-    RESTRICTED = "restricted"
+    PII = "pii"
 
 class EdgeType(str, Enum):
-    """Relationship types between steps"""
-    NEXT = "NEXT"                     # Sequential flow
-    DEPENDS_ON = "DEPENDS_ON"         # Logical dependency
-    RELATED = "RELATED"               # Thematic connection
-    CONTRADICTS = "CONTRADICTS"       # Conflicting reasoning
-    REFINES = "REFINES"               # Improvement of prior step
-    ALTERNATIVES = "ALTERNATIVES"     # Different approach
-    PREREQUISITE = "PREREQUISITE"     # Must come before
+    """Relationship types between steps — aligned to canonical schema (lowercase values)"""
+    NEXT = "next"
+    SUPPORTS = "supports"
+    REFUTES = "refutes"
+    REVISES = "revises"
+    DEPENDS_ON = "depends_on"
+    USES_TOOL = "uses_tool"
+    MENTIONS = "mentions"
+    EVIDENCE_FOR = "evidence_for"
+    DECISION_FOR = "decision_for"
+    INSTANCE_OF = "instance_of"
+    CREATES = "creates"
+    USES = "uses"
+    OTHER = "other"
 ```
 
 ---
@@ -80,7 +83,7 @@ class EdgeType(str, Enum):
 ## SourceRef: Provenance Origin
 
 ```python
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from datetime import datetime
 from typing import Optional, List
 import json
@@ -88,8 +91,8 @@ import json
 class SourceRef(BaseModel):
     """Reference to source dataset or origin"""
     
-    source_type: Literal["huggingface", "web", "user_input", "system"] = Field(
-        description="Origin type"
+    source_type: Literal["huggingface", "chat", "tool_run", "repo", "paper", "other"] = Field(
+        description="Origin type — aligned to canonical SourceType enum"
     )
     source_id: str = Field(
         description="Dataset ID or URL (e.g., 'open-thoughts/OpenThoughts-114k')",
@@ -98,15 +101,29 @@ class SourceRef(BaseModel):
     )
     record_id: Optional[str] = Field(
         default=None,
-        description="Index or ID within source dataset"
+        description="Index or ID within source dataset (alphanumeric + underscore, max 300 chars)"
     )
+    
+    @field_validator("record_id")
+    @classmethod
+    def record_id_format(cls, v):
+        """Validate record_id is alphanumeric + underscore only"""
+        if v is not None:
+            if len(v) > 300:
+                raise ValueError(f"record_id must be ≤ 300 chars; got {len(v)}")
+            if not all(c.isalnum() or c == '_' for c in v):
+                raise ValueError(
+                    f"record_id must be alphanumeric + underscore only; "
+                    f"got '{v}' with invalid characters"
+                )
+        return v
     
     class Config:
         json_schema_extra = {
             "example": {
                 "source_type": "huggingface",
                 "source_id": "open-thoughts/OpenThoughts-114k",
-                "record_id": "12345"
+                "record_id": "record_12345_v2"
             }
         }
 ```
@@ -124,8 +141,8 @@ class Trace(BaseModel):
     
     # Identity
     trace_id: str = Field(
-        description="Unique identifier: base58(SHA256(problem+domain+tags))[:12] + ULID[:8]",
-        pattern="^[a-zA-Z0-9]{12}[a-zA-Z0-9]{8}$"
+        description="Unique identifier: base58(SHA256(problem+domain+tags))[:12] + '-' + ULID[:8]",
+        pattern="^[a-zA-Z0-9]{12}-[a-zA-Z0-9]{8}$"
     )
     
     # Problem description
@@ -164,15 +181,15 @@ class Trace(BaseModel):
     
     # Provenance (Principle IX: Immutable origin tracking)
     provenance_sources: List[SourceRef] = Field(
-        min_items=1,
+        min_length=1,
         description="Data origin(s)"
     )
     provenance_license: str = Field(
         examples=["apache-2.0", "mit", "cc-by-4.0", "public-domain"],
         description="License of source material"
     )
-    provenance_sensitivity: SensitivityLevel = Field(
-        default=SensitivityLevel.PUBLIC,
+    provenance_sensitivity: Sensitivity = Field(
+        default=Sensitivity.PUBLIC,
         description="Data classification"
     )
     provenance_ingested_at: datetime = Field(
@@ -205,7 +222,7 @@ class Trace(BaseModel):
                 "trace_id": "7k9mQ2aBc1NoPqRvS2tUvWxYz0",
                 "title": "Solve quadratic equation with integer roots",
                 "problem": "Find all integer solutions to x² - 5x + 6 = 0",
-                "domain": "mathematics",
+                "domain": "general",
                 "trace_version": 1,
                 "content_hash": "a1b2c3d4e5f6...",
                 "n_steps": 4,
@@ -280,7 +297,7 @@ class Step(BaseModel):
     text_version: int = Field(
         default=1,
         ge=1,
-        description="Increments when text edited (FR-011)"
+        description="Increments when text edited (FR-013)"
     )
     
     # Embedding (Principle VII: Dual-store, Principle VI: Schema)
@@ -291,6 +308,24 @@ class Step(BaseModel):
     embedding_version: Optional[int] = Field(
         default=None,
         description="Bound to text_version; NULL if needs re-embedding"
+    )
+    
+    # Danger scores (aligned to canonical DangerScores; populated in Phase 2)
+    danger_ambiguity: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0,
+        description="Ambiguity danger score; None until computed"
+    )
+    danger_adversarial: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0,
+        description="Adversarial danger score; None until computed"
+    )
+    danger_irreversibility: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0,
+        description="Irreversibility danger score; None until computed"
+    )
+    danger_institutional: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0,
+        description="Institutional danger score; None until computed"
     )
     
     # Timestamps
@@ -304,11 +339,12 @@ class Step(BaseModel):
         description="Soft-delete timestamp"
     )
     
-    @validator("text_version")
-    def text_version_consistency(cls, v, values):
+    @field_validator("text_version")
+    @classmethod
+    def text_version_consistency(cls, v, info):
         """Ensure text_version never decrements"""
-        if "embedding_version" in values and values["embedding_version"]:
-            if values["embedding_version"] > v:
+        if "embedding_version" in info.data and info.data["embedding_version"]:
+            if info.data["embedding_version"] > v:
                 raise ValueError("embedding_version cannot exceed text_version")
         return v
     
@@ -370,10 +406,11 @@ class Edge(BaseModel):
         description="Optional edge-specific data (e.g., reasoning for REFINES)"
     )
     
-    @validator("src_id", "dst_id")
-    def ids_must_differ(cls, v, values):
+    @field_validator("src_id", "dst_id")
+    @classmethod
+    def ids_must_differ(cls, v, info):
         """Prevent self-loops"""
-        if "src_id" in values and values["src_id"] == v and v == values.get("dst_id"):
+        if "src_id" in info.data and info.data["src_id"] == v and v == info.data.get("dst_id"):
             raise ValueError("Edge cannot loop to itself")
         return v
     
@@ -381,7 +418,7 @@ class Edge(BaseModel):
         json_schema_extra = {
             "example": {
                 "edge_id": "01ARZ3NDEKTSV4RRFFQ7BJ2HZA",
-                "type": "NEXT",
+                "type": "next",
                 "src_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
                 "dst_id": "01ARZ3NDEKTSV4RRFFQ7BJ3HCB",
                 "weight": 1.0,
@@ -409,38 +446,42 @@ class Embedding(BaseModel):
         description="Model used to generate vector"
     )
     vector: List[float] = Field(
-        min_items=384,
-        max_items=1536,
-        description="Embedding vector (usually 384-1536 dimensions)"
+        min_length=384,
+        max_length=8192,
+        description="Embedding vector (384–8192 dimensions depending on model)"
     )
     text_version_bound: int = Field(
         description="Bound to Step.text_version; increment on edit"
     )
     
-    # Danger markers (computed in Phase 2)
+    # Danger markers (computed in Phase 2; range [0, 1])
     danger_ambiguity: float = Field(
         default=0.0,
-        ge=-1.0,
+        ge=0.0,
         le=1.0,
-        description="0=clear, 1=ambiguous, -1=needs recomputation"
+        description="0=clear, 1=ambiguous"
     )
     danger_adversarial: float = Field(
         default=0.0,
-        ge=-1.0,
+        ge=0.0,
         le=1.0,
-        description="0=benign, 1=adversarial, -1=needs recomputation"
+        description="0=benign, 1=adversarial"
     )
     danger_irreversibility: float = Field(
         default=0.0,
-        ge=-1.0,
+        ge=0.0,
         le=1.0,
-        description="0=reversible, 1=irreversible, -1=needs recomputation"
+        description="0=reversible, 1=irreversible"
     )
     danger_institutional: float = Field(
         default=0.0,
-        ge=-1.0,
+        ge=0.0,
         le=1.0,
-        description="0=individual, 1=institutional, -1=needs recomputation"
+        description="0=individual, 1=institutional"
+    )
+    danger_stale: bool = Field(
+        default=False,
+        description="True when text edited but danger not yet recomputed"
     )
     
     created_at: datetime = Field(description="When embedding computed")
@@ -449,7 +490,8 @@ class Embedding(BaseModel):
         description="When danger markers recalculated"
     )
     
-    @validator("vector")
+    @field_validator("vector")
+    @classmethod
     def vector_magnitude(cls, v):
         """Ensure vectors are normalized (L2 ≈ 1)"""
         magnitude = sum(x**2 for x in v) ** 0.5
@@ -650,6 +692,258 @@ class StepWindow(BaseModel):
 
 ---
 
+## Pattern: Reusable Reasoning Structure
+
+```python
+class PatternType(str, Enum):
+    """Classification of pattern detection method"""
+    FSM_SUBPATH = "fsm_subpath"
+    GRAPH_MOTIF = "graph_motif"
+    SEMANTIC_CLUSTER = "semantic_cluster"
+    MANUAL = "manual"
+
+
+class PatternTemplateStep(BaseModel):
+    """Template for a step within a pattern"""
+    
+    role: Literal[
+        "goal", "question", "plan", "action", "tool_call", "observation",
+        "critique", "revision", "decision", "verification", "summary", "other"
+    ] = Field(
+        description="Step role (from canonical StepRole enum)"
+    )
+    fsm_state: Optional[str] = Field(
+        default=None,
+        description="Optional FSM state filter"
+    )
+    text_template: str = Field(
+        description="Template text with {placeholders} for slots"
+    )
+    slots: dict = Field(
+        default_factory=dict,
+        description="Variable names and descriptions for template substitution"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "role": "plan",
+                "fsm_state": "planning_phase",
+                "text_template": "Plan to {action} by considering {factors}",
+                "slots": {
+                    "action": "the main task",
+                    "factors": "key considerations"
+                }
+            }
+        }
+
+
+class PatternApplicability(BaseModel):
+    """Constraints and filters for when a pattern applies"""
+    
+    fsm_id: Optional[str] = Field(
+        default=None,
+        description="FSM instance ID (if pattern is FSM-specific)"
+    )
+    allowed_states: list = Field(
+        default_factory=list,
+        description="FSM states where pattern is applicable"
+    )
+    domains: list = Field(
+        default_factory=list,
+        description="Applicable domains from DomainTag enum"
+    )
+    required_tags: list = Field(
+        default_factory=list,
+        description="Trace tags that must be present"
+    )
+    forbidden_tags: list = Field(
+        default_factory=list,
+        description="Trace tags that exclude pattern"
+    )
+    min_danger: dict = Field(
+        default_factory=dict,
+        description="Min danger thresholds (e.g., {'ambiguity': 0.3})"
+    )
+    max_danger: dict = Field(
+        default_factory=dict,
+        description="Max danger thresholds (e.g., {'adversarial': 0.5})"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "fsm_id": None,
+                "allowed_states": ["planning", "execution"],
+                "domains": ["software", "ml"],
+                "required_tags": ["optimization"],
+                "forbidden_tags": [" exploitative"],
+                "min_danger": {"ambiguity": 0.1},
+                "max_danger": {"irreversibility": 0.8}
+            }
+        }
+
+
+class PatternQuality(BaseModel):
+    """Metrics and quality measures for a pattern"""
+    
+    support: int = Field(
+        default=0,
+        ge=0,
+        description="Number of traces containing this pattern"
+    )
+    avg_revision_loops: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        description="Average number of revision iterations"
+    )
+    verification_rate: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of successful traces"
+    )
+    success_proxy: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Proxy score for pattern quality (model-derived)"
+    )
+    last_updated_at: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp of last quality metric update"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "support": 42,
+                "avg_revision_loops": 1.5,
+                "verification_rate": 0.85,
+                "success_proxy": 0.82,
+                "last_updated_at": "2026-02-12T10:30:10Z"
+            }
+        }
+
+
+class Pattern(BaseModel):
+    """Reusable reasoning pattern detected or mined from traces"""
+    
+    pattern_id: str = Field(
+        pattern="^[a-zA-Z0-9]{12}-[a-zA-Z0-9]{8}$",
+        description="Unique pattern ID (base58 format)"
+    )
+    type: PatternType = Field(
+        description="Pattern detection method"
+    )
+    
+    name: str = Field(
+        description="Human-readable pattern name (e.g., 'Binary Search Optimization')"
+    )
+    description: Optional[str] = Field(
+        default=None,
+        description="Detailed description of pattern behavior"
+    )
+    
+    applicability: PatternApplicability = Field(
+        default_factory=PatternApplicability,
+        description="When this pattern should be applied"
+    )
+    template: list = Field(
+        default_factory=list,
+        description="Sequence of PatternTemplateStep objects"
+    )
+    embedding: Optional[str] = Field(
+        default=None,
+        description="Optional reference to vector embedding of pattern"
+    )
+    quality: PatternQuality = Field(
+        default_factory=PatternQuality,
+        description="Quality metrics"
+    )
+    
+    created_at: Optional[datetime] = Field(
+        default=None,
+        description="When pattern was first detected"
+    )
+    miner_version: Optional[str] = Field(
+        default=None,
+        description="Version of pattern mining algorithm that found it"
+    )
+    schema_version: str = Field(
+        default="v1",
+        description="Schema version for evolution"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "pattern_id": "pattern-001-abcd1234",
+                "type": "fsm_subpath",
+                "name": "Binary Search Scope Refinement",
+                "description": "Narrow search space by dividing domain in half",
+                "applicability": {...},  # PatternApplicability example
+                "template": [
+                    {
+                        "role": "goal",
+                        "text_template": "Narrow scope: search in {domain_half}",
+                        "slots": {"domain_half": "left or right half"}
+                    }
+                ],
+                "quality": {
+                    "support": 23,
+                    "verification_rate": 0.9
+                },
+                "created_at": "2026-02-01T08:00:00Z",
+                "miner_version": "v0.1.0"
+            }
+        }
+
+
+class PatternInstance(BaseModel):
+    """Instantiation of a pattern within a specific trace"""
+    
+    instance_id: str = Field(
+        pattern="^[a-zA-Z0-9]{12}-[a-zA-Z0-9]{8}$",
+        description="Unique instance ID"
+    )
+    pattern_id: str = Field(
+        description="Reference to Pattern.pattern_id"
+    )
+    trace_id: str = Field(
+        description="Trace where pattern was found"
+    )
+    
+    step_ids: list = Field(
+        default_factory=list,
+        description="Sequence of step IDs matching pattern template"
+    )
+    bindings: dict = Field(
+        default_factory=dict,
+        description="Slot bindings (e.g., {'domain_half': 'left'})"
+    )
+    success_proxy: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Quality score for this instance"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "instance_id": "inst-001-efgh5678",
+                "pattern_id": "pattern-001-abcd1234",
+                "trace_id": "trace-001-ijkl9012",
+                "step_ids": ["01ARZ3NDEKTSV4RRFFQ69G5FAV", "01ARZ3NDEKTSV4RRFFQ7BJ3HCB"],
+                "bindings": {"domain_half": "left"},
+                "success_proxy": 0.88
+            }
+        }
+```
+
+---
+
 ## TraceBundle: Atomic Ingestion Unit
 
 ```python
@@ -661,7 +955,7 @@ class TraceBundle(BaseModel):
     
     trace: Trace
     steps: List[Step] = Field(
-        min_items=1,
+        min_length=1,
         description="Steps in order (index must be 0..n-1)"
     )
     edges: List[Edge] = Field(
@@ -669,7 +963,8 @@ class TraceBundle(BaseModel):
         description="Relationships (typically NEXT edges)"
     )
     
-    @validator("steps")
+    @field_validator("steps")
+    @classmethod
     def steps_must_be_ordered(cls, v):
         """Validate step indexes are contiguous 0..n-1"""
         if not v:
@@ -685,24 +980,26 @@ class TraceBundle(BaseModel):
             )
         return v
     
-    @validator("trace")
-    def trace_step_count_matches(cls, v, values):
+    @field_validator("trace")
+    @classmethod
+    def trace_step_count_matches(cls, v, info):
         """Ensure trace.n_steps matches actual step count"""
-        if "steps" in values:
-            if v.n_steps != len(values["steps"]):
+        if "steps" in info.data:
+            if v.n_steps != len(info.data["steps"]):
                 raise ValueError(
                     f"Trace.n_steps ({v.n_steps}) must match "
-                    f"actual steps count ({len(values['steps'])})"
+                    f"actual steps count ({len(info.data['steps'])})"
                 )
         return v
     
-    @validator("edges")
-    def edges_reference_valid_steps(cls, v, values):
+    @field_validator("edges")
+    @classmethod
+    def edges_reference_valid_steps(cls, v, info):
         """Every edge must reference existing steps"""
-        if "steps" not in values:
+        if "steps" not in info.data:
             return v
         
-        step_ids = set(s.step_id for s in values["steps"])
+        step_ids = set(s.step_id for s in info.data["steps"])
         
         for edge in v:
             if edge.src_id not in step_ids:

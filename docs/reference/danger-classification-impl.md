@@ -1,21 +1,24 @@
-# Python example for the "Danger Router"
+# Danger Classification — Reference Implementation
 
+> Python reference skeleton: regex + probe-based danger classifier, guards integrated into FSM transition checks, and unit tests (pytest).
+>
+> **Note on model re-declarations:** This module defines its own `DangerScores` and `DangerEvidence` models for self-contained readability. In production, these should import from or align to [Canonical Schemas](canonical-schemas.md). The `evidence` field here is the authoritative shape; it has been back-ported to the canonical `DangerScores`.
+>
+> For the design rationale behind this code, see [Danger Classification](../domain/danger-classification.md). For the schemas it implements, see [Canonical Schemas](canonical-schemas.md) (`DangerType`, `DangerScores`). For the FSM guards this code enforces, see [FSM Catalogue — Transition Guards](../domain/fsm-catalogue.md#transition-guards).
+
+---
 
 ```python
 """
 danger_router_pydantic.py
 
-Compact reference skeleton (Pydantic):
+Compact reference skeleton (Pydantic v2):
 - Regex + probe-based danger classifier
 - Guards integrated into FSM transition checks
 - Minimal unit tests (pytest)
 
 Requires: pydantic>=2
 Optional: pytest for tests
-
-Design notes:
-- ProbeClient is an interface you plug into an LLM provider.
-- Scoring is transparent + easy to calibrate later.
 """
 
 from __future__ import annotations
@@ -75,7 +78,6 @@ class DangerScores(BaseModel):
 
     @model_validator(mode="after")
     def _validate_scores(self) -> "DangerScores":
-        # Ensure all four keys exist, clip to [0,1]
         for dt in DangerType:
             if dt not in self.scores:
                 self.scores[dt] = 0.0
@@ -121,11 +123,10 @@ class FSMContext(BaseModel):
 # -----------------------------
 
 class ProbeClient(Protocol):
-    def run_probes(self, text: str, probe_specs: List[Dict[str, str]]) -> List[ProbeResult]:
-        """
-        Implement with your LLM provider.
-        Must return valid ProbeResult list (Pydantic models).
-        """
+    def run_probes(
+        self, text: str, probe_specs: List[Dict[str, str]]
+    ) -> List[ProbeResult]:
+        """Implement with your LLM provider."""
         ...
 
 
@@ -139,26 +140,46 @@ METRIC_TOKENS = re.compile(
     re.IGNORECASE,
 )
 
-RULES: Dict[DangerType, List[Tuple[str, re.Pattern]]] = {
+RULES: Dict[DangerType, List[Tuple[str, re.Pattern, None]]] = {
     DangerType.AMBIGUITY: [
-        ("vague_verb", re.compile(r"\b(improve|better|enhance|optimi[sz]e|increase|reduce|make|handle|support|enable|ensure)\b", re.I)),
-        ("vague_adj", re.compile(r"\b(scalable|robust|reliable|secure|safe|fast|efficient|user[- ]?friendly|production[- ]?ready)\b", re.I)),
-        ("missing_object", re.compile(r"\b(make|improve|optimi[sz]e|fix)\s+(it|this|that)\b", re.I)),
+        ("vague_verb", re.compile(
+            r"\b(improve|better|enhance|optimi[sz]e|increase|reduce|make|handle|support|enable|ensure)\b", re.I), None),
+        ("vague_adj", re.compile(
+            r"\b(scalable|robust|reliable|secure|safe|fast|efficient|user[- ]?friendly|production[- ]?ready)\b", re.I), None),
+        ("missing_object", re.compile(
+            r"\b(make|improve|optimi[sz]e|fix)\s+(it|this|that)\b", re.I), None),
     ],
     DangerType.ADVERSARIAL: [
-        ("adversarial_terms", re.compile(r"\b(adversar(y|ial)|attack|bypass|evade|abuse|fraud|spam|bot(s)?|cheat|exploit|poison(ing)?|prompt injection|jailbreak|ddos|phish(ing)?|malware|red team)\b", re.I)),
-        ("tands", re.compile(r"\b(content moderation|trust and safety|t&s)\b", re.I)),
-        ("incentives", re.compile(r"\b(incentive|game(d|ing)?|arms race|cat[- ]?and[- ]?mouse|adaptive|strateg(y|ic))\b", re.I)),
+        ("adversarial_terms", re.compile(
+            r"\b(adversar(y|ial)|attack|bypass|evade|abuse|fraud|spam|bot(s)?|cheat|exploit|"
+            r"poison(ing)?|prompt injection|jailbreak|ddos|phish(ing)?|malware|red team)\b", re.I), None),
+        ("tands", re.compile(
+            r"\b(content moderation|trust and safety|t&s)\b", re.I), None),
+        ("incentives", re.compile(
+            r"\b(incentive|game(d|ing)?|arms race|cat[- ]?and[- ]?mouse|adaptive|strateg(y|ic))\b", re.I), None),
     ],
     DangerType.IRREVERSIBILITY: [
-        ("high_stakes_domain", re.compile(r"\b(medical|patient|clinical|diagnos(is|e)|treatment|drug|dose|legal|court|lawsuit|compliance|regulator(y)?|safety[- ]critical|aviation|automotive|nuclear|financial advice|credit decision)\b", re.I)),
-        ("no_rollback", re.compile(r"\b(irrevocable|irreversible|cannot undo|no rollback|one[- ]?way door|point of no return|permanent)\b", re.I)),
-        ("harm_terms", re.compile(r"\b(life|death|harm|injur(y|ies)|liability|fine(s)?|penalt(y|ies)|prison|reputation(al)? damage)\b", re.I)),
+        ("high_stakes_domain", re.compile(
+            r"\b(medical|patient|clinical|diagnos(is|e)|treatment|drug|dose|legal|court|lawsuit|"
+            r"compliance|regulator(y)?|safety[- ]critical|aviation|automotive|nuclear|"
+            r"financial advice|credit decision)\b", re.I), None),
+        ("no_rollback", re.compile(
+            r"\b(irrevocable|irreversible|cannot undo|no rollback|one[- ]?way door|"
+            r"point of no return|permanent)\b", re.I), None),
+        ("harm_terms", re.compile(
+            r"\b(life|death|harm|injur(y|ies)|liability|fine(s)?|penalt(y|ies)|prison|"
+            r"reputation(al)? damage)\b", re.I), None),
     ],
     DangerType.INSTITUTIONAL: [
-        ("stakeholders", re.compile(r"\b(board|committee|leadership|exec(s)?|legal team|procurement|union|works council|regulator|auditor|compliance|risk team|security team|stakeholder(s)?)\b", re.I)),
-        ("politics", re.compile(r"\b(politic(s|al)|optics|narrative|buy[- ]?in|alignment|approval|sign[- ]?off|veto|governance|bureaucrac(y|ies)|public sector)\b", re.I)),
-        ("blocked", re.compile(r"\b(they (won't|will not|refuse)|not allowed|forbidden|blocked|cannot get approval)\b", re.I)),
+        ("stakeholders", re.compile(
+            r"\b(board|committee|leadership|exec(s)?|legal team|procurement|union|works council|"
+            r"regulator|auditor|compliance|risk team|security team|stakeholder(s)?)\b", re.I), None),
+        ("politics", re.compile(
+            r"\b(politic(s|al)|optics|narrative|buy[- ]?in|alignment|approval|sign[- ]?off|"
+            r"veto|governance|bureaucrac(y|ies)|public sector)\b", re.I), None),
+        ("blocked", re.compile(
+            r"\b(they (won't|will not|refuse)|not allowed|forbidden|blocked|"
+            r"cannot get approval)\b", re.I), None),
     ],
 }
 
@@ -168,15 +189,16 @@ RULES: Dict[DangerType, List[Tuple[str, re.Pattern]]] = {
 # -----------------------------
 
 PROBES: List[Dict[str, str]] = [
-    # Ambiguity
-    {"probe_id": "amb_success_defined", "question": "Is the success criterion (metric + target + horizon) explicitly defined? Answer yes/no."},
-    {"probe_id": "amb_scope_defined", "question": "Is scope clearly defined (in/out)? Answer yes/no."},
-    # Adversarial
-    {"probe_id": "adv_adaptive_agent", "question": "Is there an agent that may try to evade, exploit, or adapt to the solution? Answer yes/no."},
-    # Irreversibility
-    {"probe_id": "irr_hard_to_rollback", "question": "Would an error cause serious harm, legal exposure, or be hard to roll back? Answer yes/no."},
-    # Institutional
-    {"probe_id": "inst_power_blocks", "question": "Are approvals, politics, optics, or governance likely to be the binding constraint? Answer yes/no."},
+    {"probe_id": "amb_success_defined",
+     "question": "Is the success criterion (metric + target + horizon) explicitly defined? Answer yes/no."},
+    {"probe_id": "amb_scope_defined",
+     "question": "Is scope clearly defined (in/out)? Answer yes/no."},
+    {"probe_id": "adv_adaptive_agent",
+     "question": "Is there an agent that may try to evade, exploit, or adapt to the solution? Answer yes/no."},
+    {"probe_id": "irr_hard_to_rollback",
+     "question": "Would an error cause serious harm, legal exposure, or be hard to roll back? Answer yes/no."},
+    {"probe_id": "inst_power_blocks",
+     "question": "Are approvals, politics, optics, or governance likely to be the binding constraint? Answer yes/no."},
 ]
 
 
@@ -206,12 +228,14 @@ def hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def extract_regex_features(text: str) -> Tuple[Dict[DangerType, List[str]], Dict[str, Any]]:
+def extract_regex_features(
+    text: str,
+) -> Tuple[Dict[DangerType, List[str]], Dict[str, Any]]:
     t = text or ""
     hits: Dict[DangerType, List[str]] = {dt: [] for dt in DangerType}
 
     for dt, rules in RULES.items():
-        for name, pat in rules:
+        for name, pat, _ in rules:
             if pat.search(t):
                 hits[dt].append(name)
 
@@ -238,7 +262,11 @@ def probe_yes(probes: List[ProbeResult], probe_id: str) -> float:
     return 0.0
 
 
-def score_dangers(regex_hits: Dict[DangerType, List[str]], flags: Dict[str, Any], probes: List[ProbeResult]) -> Dict[DangerType, float]:
+def score_dangers(
+    regex_hits: Dict[DangerType, List[str]],
+    flags: Dict[str, Any],
+    probes: List[ProbeResult],
+) -> Dict[DangerType, float]:
     # Ambiguity
     amb_hits = min(len(regex_hits[DangerType.AMBIGUITY]), 5)
     amb_absence = 1.0 if (not flags.get("has_metric_tokens") and amb_hits > 0) else 0.0
@@ -335,7 +363,6 @@ def routing_decision(danger: DangerScores) -> RoutingDecision:
     else:
         autonomy = "HIGH"
 
-    # de-dup preserving order
     actions = list(dict.fromkeys(actions))
     blocked = list(dict.fromkeys(blocked))
 
@@ -354,7 +381,9 @@ def guard_no_execute_while_ambiguous(ctx: FSMContext) -> Tuple[bool, str]:
 
 
 def guard_no_irreversible_without_verification(ctx: FSMContext) -> Tuple[bool, str]:
-    if ctx.next_is_irreversible and ctx.danger.score(DangerType.IRREVERSIBILITY) >= 0.60 and not ctx.verification_passed:
+    if (ctx.next_is_irreversible
+            and ctx.danger.score(DangerType.IRREVERSIBILITY) >= 0.60
+            and not ctx.verification_passed):
         return False, "Blocked: irreversibility dominant and verification gate not passed."
     return True, ""
 
@@ -396,12 +425,14 @@ def can_transition(ctx: FSMContext, action: Action) -> Tuple[bool, List[str]]:
             reasons.append(r)
 
     return (len(reasons) == 0), reasons
+```
 
+---
 
-# -----------------------------
-# Tests (pytest)
-# -----------------------------
-# Save as test_danger_router_pydantic.py and run: pytest -q
+## Tests (pytest)
+
+```python
+# test_danger_router_pydantic.py — run: pytest -q
 
 def _fake_probes_yes(yes_ids: List[str]) -> List[ProbeResult]:
     out: List[ProbeResult] = []
@@ -417,7 +448,7 @@ def _fake_probes_yes(yes_ids: List[str]) -> List[ProbeResult]:
 def test_ambiguity_detects_vague_no_metrics():
     text = "Make it scalable and robust for production."
     hits, flags = extract_regex_features(text)
-    probes = _fake_probes_yes(yes_ids=[])  # all "no"
+    probes = _fake_probes_yes(yes_ids=[])
     scores = score_dangers(hits, flags, probes)
     assert scores[DangerType.AMBIGUITY] >= 0.60
 

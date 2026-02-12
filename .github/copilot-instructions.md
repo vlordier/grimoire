@@ -45,7 +45,7 @@ specs/
     ├── contracts/      # Phase 1: API/interface contracts
     └── tasks.md        # Phase 2: Concrete implementation tasks
 
-SPEC.md                 # High-level project specification
+docs/                   # Project documentation (see README.md for map)
 ```
 
 ### Agent-Driven Development

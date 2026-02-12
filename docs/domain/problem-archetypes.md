@@ -1,20 +1,24 @@
-Below is the full set of archetypes (the ones we discussed up to ~95% coverage), with enough detail that you can directly turn them into: (a) graph schemas, (b) “meta-thought” templates, (c) labels for traces, and (d) retrieval intents.
+# Problem Archetypes
+
+> A taxonomy of 15 problem archetypes that the system must recognize. These 15 archetypes are compressed into 10 universal FSMs in [fsm-catalogue.md](fsm-catalogue.md).
+>
+> **See also:** [FSM Catalogue](fsm-catalogue.md) · [Danger Classification](danger-classification.md) · [Control Pattern Taxonomy](control-pattern-taxonomy.md) · [Canonical Schemas](../reference/canonical-schemas.md)
 
 ---
 
-# 1) Diagnosis / Debugging
+## 1. Diagnosis / Debugging
 
-## What it is
+### What it is
 
-Something exists and is supposed to work. It doesn’t. You need the cause and a fix.
+Something exists and is supposed to work. It doesn't. You need the cause and a fix.
 
-## Typical inputs
+### Typical inputs
 
-* Symptom report (“latency spikes”, “accuracy dropped”, “crash in prod”)
+* Symptom report ("latency spikes", "accuracy dropped", "crash in prod")
 * Logs, traces, metrics
 * Recent changes (deploys, data drift, config updates)
 
-## Subtypes
+### Subtypes
 
 * **Functional bug**: wrong outputs
 * **Performance bug**: slow/memory/throughput
@@ -22,10 +26,10 @@ Something exists and is supposed to work. It doesn’t. You need the cause and a
 * **Data bug**: schema shifts, null spikes, label leakage
 * **Integration bug**: contracts/versions mismatch
 
-## Canonical steps (meta-thought)
+### Canonical steps (meta-thought)
 
 1. **Restate symptom precisely** (what, where, since when, blast radius)
-2. **Establish baseline** (what “normal” looks like)
+2. **Establish baseline** (what "normal" looks like)
 3. **Triage severity** (impact, urgency, rollback option)
 4. **Generate hypotheses** (ranked by likelihood × impact)
 5. **Collect discriminating evidence** (logs, metrics, bisect, reproduce)
@@ -35,20 +39,20 @@ Something exists and is supposed to work. It doesn’t. You need the cause and a
 9. **Verify** (tests + metrics + user behavior)
 10. **Prevent recurrence** (guardrails, monitors, runbooks)
 
-## Failure modes
+### Failure modes
 
 * Fixing symptoms not causes
 * No minimal repro → endless guesswork
 * Too many hypotheses, no ranking
-* “Works on my machine” environment drift
+* "Works on my machine" environment drift
 
-## Graph/motif signature
+### Graph/motif signature
 
 * Lots of short loops: `OBSERVATION → CRITIQUE → REVISE`
 * Many tool calls
-* High density of causal edges (“because”, “therefore”)
+* High density of causal edges ("because", "therefore")
 
-## What to store as “meta-thought assets”
+### Meta-thought assets
 
 * Common debugging loops by domain (ML, infra, data pipelines)
 * Hypothesis ranking heuristics
@@ -56,26 +60,26 @@ Something exists and is supposed to work. It doesn’t. You need the cause and a
 
 ---
 
-# 2) Design Under Constraints
+## 2. Design Under Constraints
 
-## What it is
+### What it is
 
 You need to build or define something new, but constraints dominate.
 
-## Typical inputs
+### Typical inputs
 
-* Goal statement (“build X”)
+* Goal statement ("build X")
 * Constraints: budget, time, legal, safety, latency, staffing, dependencies
 * Non-functional requirements
 
-## Subtypes
+### Subtypes
 
 * **Architecture design**
 * **Product design**
 * **System interface design**
 * **Org/process design** (overlaps with meta-process)
 
-## Canonical steps
+### Canonical steps
 
 1. Clarify the goal and success criteria
 2. Enumerate constraints explicitly (hard vs soft)
@@ -86,45 +90,45 @@ You need to build or define something new, but constraints dominate.
 7. Define interfaces/contracts
 8. Plan rollout (milestones, risks, owners)
 
-## Failure modes
+### Failure modes
 
-* Building the “cool” solution, not the feasible one
+* Building the "cool" solution, not the feasible one
 * Missing a hard constraint (legal/security) until late
 * No alternatives considered
 
-## Graph signature
+### Graph signature
 
 * Early `PLAN`, then branch-per-option, then `DECISION`
 * Constraints are central nodes connected to many steps
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Tradeoff matrices
 * Architecture decision records (ADR patterns)
-* “Hard-constraint-first” check templates
+* "Hard-constraint-first" check templates
 
 ---
 
-# 3) Optimization / Improvement
+## 3. Optimization / Improvement
 
-## What it is
+### What it is
 
 Something works; you want a better metric without a full redesign (yet).
 
-## Typical inputs
+### Typical inputs
 
 * Baseline metrics and target thresholds
 * Bottleneck suspects
 * Allowed interventions
 
-## Subtypes
+### Subtypes
 
 * **Performance tuning**
 * **Cost reduction**
 * **Quality improvement**
 * **Conversion/engagement optimization**
 
-## Canonical steps
+### Canonical steps
 
 1. Define metric unambiguously (and how measured)
 2. Identify levers (what can change the metric)
@@ -133,46 +137,46 @@ Something works; you want a better metric without a full redesign (yet).
 5. Measure impact (and regressions)
 6. Iterate; stop when marginal gains flatten
 
-## Failure modes
+### Failure modes
 
 * Metric gaming
 * Confounding variables (no control)
 * Local optimum traps
 * Overfitting to benchmark
 
-## Graph signature
+### Graph signature
 
 * Repeated experiment cycles
-* Many metric nodes, A/B links, “before/after” observations
+* Many metric nodes, A/B links, "before/after" observations
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Experiment design templates
-* Guardrails (don’t break reliability/safety)
+* Guardrails (don't break reliability/safety)
 * Bottleneck classification patterns
 
 ---
 
-# 4) Explanation / Sense-making (Mental Model Building)
+## 4. Explanation / Sense-making (Mental Model Building)
 
-## What it is
+### What it is
 
 The task is understanding and communicating a system or concept clearly.
 
-## Typical inputs
+### Typical inputs
 
-* User’s confusion or knowledge gap
+* User's confusion or knowledge gap
 * A complex system description
 * Need for a simplified model
 
-## Subtypes
+### Subtypes
 
 * **Teach/educate**
 * **Summarize**
 * **Conceptual modeling**
 * **Onboarding docs**
 
-## Canonical steps
+### Canonical steps
 
 1. Identify target audience and prior knowledge
 2. Choose abstraction level (what to omit)
@@ -182,46 +186,46 @@ The task is understanding and communicating a system or concept clearly.
 6. Validate understanding with checkpoints
 7. Summarize with a compact representation
 
-## Failure modes
+### Failure modes
 
 * Too detailed too early
 * Wrong abstraction
-* Missing the “why” (purpose)
+* Missing the "why" (purpose)
 
-## Graph signature
+### Graph signature
 
 * Few tool calls
 * Long coherent chains
 * Ends in `SUMMARY` / `MODEL`
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Explanation styles by audience
 * Common analogy libraries per domain
-* “Progressive disclosure” templates
+* "Progressive disclosure" templates
 
 ---
 
-# 5) Decision / Selection
+## 5. Decision / Selection
 
-## What it is
+### What it is
 
 Choose between options with incomplete information and constraints.
 
-## Typical inputs
+### Typical inputs
 
 * A set of options (sometimes implicit)
 * Criteria, risks, costs
 * Time pressure
 
-## Subtypes
+### Subtypes
 
 * **Vendor selection**
 * **Hiring choice**
 * **Tech stack choice**
 * **Strategy choice**
 
-## Canonical steps
+### Canonical steps
 
 1. Make options explicit
 2. Define decision criteria and weights
@@ -230,45 +234,45 @@ Choose between options with incomplete information and constraints.
 5. Identify one-way doors vs reversible decisions
 6. Decide; document rationale; set review point
 
-## Failure modes
+### Failure modes
 
-* Criteria drift (“moving goalposts”)
+* Criteria drift ("moving goalposts")
 * Overweighting anecdotes
 * Avoiding decision → endless analysis
 
-## Graph signature
+### Graph signature
 
 * Parallel subgraphs per option
 * Converges into a single decision node
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Scoring rubrics
-* “Reversible vs irreversible” gating
+* "Reversible vs irreversible" gating
 * Sensitivity analysis patterns
 
 ---
 
-# 6) Translation / Transformation
+## 6. Translation / Transformation
 
-## What it is
+### What it is
 
 Convert an artifact from one form to another while preserving invariants.
 
-## Typical inputs
+### Typical inputs
 
 * Source artifact (text, code, schema, data)
 * Target format and constraints
 * Invariants (must not change meaning/behavior)
 
-## Subtypes
+### Subtypes
 
 * **Refactoring**
 * **Spec → implementation**
 * **Data normalization**
 * **Migration (DB, infra)**
 
-## Canonical steps
+### Canonical steps
 
 1. Parse and understand source
 2. Define invariants and test oracle
@@ -277,18 +281,18 @@ Convert an artifact from one form to another while preserving invariants.
 5. Validate equivalence continuously
 6. Final verification + rollout
 
-## Failure modes
+### Failure modes
 
 * No oracle/test → silent semantic drift
 * Big-bang rewrite
 * Partial transformations that break interfaces
 
-## Graph signature
+### Graph signature
 
 * Linear progression with frequent `VERIFY`
 * Heavy dependency edges (contracts, schemas)
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Invariant checklists
 * Migration playbooks
@@ -296,19 +300,19 @@ Convert an artifact from one form to another while preserving invariants.
 
 ---
 
-# 7) Constraint Conflict Resolution
+## 7. Constraint Conflict Resolution
 
-## What it is
+### What it is
 
-Constraints can’t all be satisfied; you must negotiate, relax, or reframe.
+Constraints can't all be satisfied; you must negotiate, relax, or reframe.
 
-## Typical inputs
+### Typical inputs
 
-* Two “hard” requirements that collide
+* Two "hard" requirements that collide
 * Stakeholders with different priorities
 * Regulatory or safety constraints
 
-## Canonical steps
+### Canonical steps
 
 1. Enumerate constraints and their authority levels
 2. Prove the conflict (not assumed)
@@ -317,38 +321,38 @@ Constraints can’t all be satisfied; you must negotiate, relax, or reframe.
 5. Escalate decision to the right authority
 6. Document tradeoff and residual risk
 
-## Failure modes
+### Failure modes
 
 * Treating soft constraints as hard (or vice versa)
 * Hidden veto stakeholders
 * No written decision record → repeat arguments later
 
-## Graph signature
+### Graph signature
 
 * `CONFLICT` node linked to constraint nodes
 * Decision justified by authority and feasibility
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Authority hierarchy model
 * Tradeoff documentation templates
-* “Scope-time-quality” negotiation patterns
+* "Scope-time-quality" negotiation patterns
 
 ---
 
-# 8) Failure Analysis / Post-mortem
+## 8. Failure Analysis / Post-mortem
 
-## What it is
+### What it is
 
 A failure already happened; goal is learning and prevention, not just fixing.
 
-## Typical inputs
+### Typical inputs
 
 * Incident timeline
 * Logs and metrics around event
 * Impact assessment
 
-## Canonical steps
+### Canonical steps
 
 1. Build timeline (what happened when)
 2. Identify trigger(s)
@@ -358,38 +362,38 @@ A failure already happened; goal is learning and prevention, not just fixing.
 6. Action items: prevention and detection
 7. Ownership and follow-up dates
 
-## Failure modes
+### Failure modes
 
 * Blame narratives
 * Single-cause fallacy
 * Actions too vague to implement
 
-## Graph signature
+### Graph signature
 
 * Time-indexed edges
 * Causal chains with branching factors
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Incident taxonomy
 * Action item quality rubric
-* “5 whys” but with evidence constraints
+* "5 whys" but with evidence constraints
 
 ---
 
-# 9) Validation / Verification (Truth-testing)
+## 9. Validation / Verification (Truth-testing)
 
-## What it is
+### What it is
 
 A claim exists; you must verify independently, often under high stakes.
 
-## Typical inputs
+### Typical inputs
 
-* A claim (“this model is SOTA”, “this is safe”, “this result is significant”)
+* A claim ("this model is SOTA", "this is safe", "this result is significant")
 * Evidence offered (papers, benchmarks, vendor docs)
 * Requirements for confidence
 
-## Canonical steps
+### Canonical steps
 
 1. Restate claim precisely
 2. List assumptions and definitions
@@ -398,18 +402,18 @@ A claim exists; you must verify independently, often under high stakes.
 5. Check for confounders and cherry-picking
 6. Conclude with calibrated confidence
 
-## Failure modes
+### Failure modes
 
 * Accepting proxy evidence
 * Not testing edge cases
 * Overconfidence language
 
-## Graph signature
+### Graph signature
 
 * Many parallel verification branches
-* Strong “assumption” nodes
+* Strong "assumption" nodes
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Verification checklists per domain
 * Confidence language templates
@@ -417,19 +421,19 @@ A claim exists; you must verify independently, often under high stakes.
 
 ---
 
-# 10) Operationalization / Productionization
+## 10. Operationalization / Productionization
 
-## What it is
+### What it is
 
 Make something survive reality: monitoring, rollbacks, ownership, reliability.
 
-## Typical inputs
+### Typical inputs
 
 * Prototype or research result
 * Operational constraints (SLA, on-call, compliance)
 * Target environment (infra, users)
 
-## Canonical steps
+### Canonical steps
 
 1. Define SLO/SLA and failure budget
 2. Identify risks and failure modes
@@ -439,18 +443,18 @@ Make something survive reality: monitoring, rollbacks, ownership, reliability.
 6. Stage rollout (dev → staging → canary → prod)
 7. Post-launch evaluation and iteration
 
-## Failure modes
+### Failure modes
 
 * No rollback path
 * No observability
-* “It works” without reliability and ops maturity
+* "It works" without reliability and ops maturity
 
-## Graph signature
+### Graph signature
 
 * Many nodes about monitoring, alerts, owners
 * Non-technical constraints appear heavily
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Production readiness checklist
 * Observability templates
@@ -458,19 +462,19 @@ Make something survive reality: monitoring, rollbacks, ownership, reliability.
 
 ---
 
-# 11) Meta-process Design
+## 11. Meta-process Design
 
-## What it is
+### What it is
 
 Designing the system that produces solutions: workflow, governance, incentives.
 
-## Typical inputs
+### Typical inputs
 
 * Repeated failures at org level
 * Bottlenecks (reviews, CI, annotation, releases)
 * Scaling constraints (people/process)
 
-## Canonical steps
+### Canonical steps
 
 1. Observe recurring breakdown patterns
 2. Locate root causes in process/incentives
@@ -478,38 +482,38 @@ Designing the system that produces solutions: workflow, governance, incentives.
 4. Define feedback metrics (cycle time, defects, satisfaction)
 5. Roll out and iterate
 
-## Failure modes
+### Failure modes
 
 * Over-engineered process
 * No adoption incentives
 * No measurement, so process drifts
 
-## Graph signature
+### Graph signature
 
 * Recursion: patterns referencing other patterns
 * Long time horizons, governance nodes
 
-## Meta-thought assets
+### Meta-thought assets
 
-* Process “design patterns”
+* Process "design patterns"
 * Measurement frameworks
 * Adoption/rollout strategies
 
 ---
 
-# 12) Ambiguity Resolution / Problem Definition
+## 12. Ambiguity Resolution / Problem Definition
 
-## What it is
+### What it is
 
 The main job is to define the real problem and success criteria.
 
-## Typical inputs
+### Typical inputs
 
 * Vague requests
 * Conflicting stakeholder statements
 * Missing constraints
 
-## Canonical steps
+### Canonical steps
 
 1. List plausible interpretations
 2. Ask discriminating questions
@@ -518,18 +522,18 @@ The main job is to define the real problem and success criteria.
 5. Confirm with stakeholders
 6. Only then design/execute
 
-## Failure modes
+### Failure modes
 
 * Jumping into solution mode
 * Hidden constraints discovered late
-* “Success” undefined → endless churn
+* "Success" undefined → endless churn
 
-## Graph signature
+### Graph signature
 
 * Early branching; later collapse into a refined goal node
-* Many “definition” nodes
+* Many "definition" nodes
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Question sets by domain (product, infra, ML)
 * Scope templates
@@ -537,19 +541,19 @@ The main job is to define the real problem and success criteria.
 
 ---
 
-# 13) Adversarial / Strategic Problems
+## 13. Adversarial / Strategic Problems
 
-## What it is
+### What it is
 
 Another agent adapts to your solution; static optimization fails.
 
-## Typical inputs
+### Typical inputs
 
 * Fraud/spam/security signals
 * Opponent incentives and capabilities
 * Feedback loops
 
-## Canonical steps
+### Canonical steps
 
 1. Define adversary model (goals, constraints, cost)
 2. Enumerate attacks/strategies
@@ -557,18 +561,18 @@ Another agent adapts to your solution; static optimization fails.
 4. Add detection and response loops
 5. Assume adaptation; plan iteration cadence
 
-## Failure modes
+### Failure modes
 
 * Building brittle defenses
 * Ignoring incentives
 * No monitoring, so you lose silently
 
-## Graph signature
+### Graph signature
 
-* Counterfactual branches (“if attacker does X”)
+* Counterfactual branches ("if attacker does X")
 * Cycles to monitoring and response
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Threat models
 * Defense-in-depth templates
@@ -576,19 +580,19 @@ Another agent adapts to your solution; static optimization fails.
 
 ---
 
-# 14) Institutional / Political Constraints
+## 14. Institutional / Political Constraints
 
-## What it is
+### What it is
 
 The correct solution is blocked by organizational power, norms, optics, or bureaucracy.
 
-## Typical inputs
+### Typical inputs
 
 * Stakeholder maps
 * Veto points
 * Reputation or compliance concerns
 
-## Canonical steps
+### Canonical steps
 
 1. Identify decision makers and veto holders
 2. Map incentives and fears
@@ -596,18 +600,18 @@ The correct solution is blocked by organizational power, norms, optics, or burea
 4. Sequence changes and build coalition
 5. Communicate carefully; document wins
 
-## Failure modes
+### Failure modes
 
-* Technical solution that can’t be adopted
+* Technical solution that can't be adopted
 * Ignoring veto points
 * Moving too fast → backlash
 
-## Graph signature
+### Graph signature
 
 * People/org nodes dominate
 * Constraints override optimality
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Stakeholder mapping templates
 * Incremental rollout strategies
@@ -615,19 +619,19 @@ The correct solution is blocked by organizational power, norms, optics, or burea
 
 ---
 
-# 15) Irreversible / One-way Door Decisions
+## 15. Irreversible / One-way Door Decisions
 
-## What it is
+### What it is
 
 Mistakes are extremely costly; rollback is impossible or slow.
 
-## Typical inputs
+### Typical inputs
 
 * High-stakes context (medical, legal, safety, reputational)
 * Low tolerance for error
 * Need for strong assurance
 
-## Canonical steps
+### Canonical steps
 
 1. Identify irreversible aspects
 2. Enumerate worst-case failures
@@ -636,19 +640,19 @@ Mistakes are extremely costly; rollback is impossible or slow.
 5. Escalate / sign-off gates
 6. Decide conservatively with explicit residual risk
 
-## Failure modes
+### Failure modes
 
 * Treating one-way doors like reversible choices
 * Underestimating tail risk
 * Skipping independent review
 
-## Graph signature
+### Graph signature
 
 * Many verification gates
 * Conservative decision language
 * Multiple approvals
 
-## Meta-thought assets
+### Meta-thought assets
 
 * Go/no-go checklists
 * Redundancy patterns
@@ -656,7 +660,7 @@ Mistakes are extremely costly; rollback is impossible or slow.
 
 ---
 
-## Cross-cutting tags you should attach (these power retrieval)
+## Cross-cutting tags (power retrieval)
 
 Attach these to traces/steps/patterns as nodes and edges:
 
@@ -667,4 +671,4 @@ Attach these to traces/steps/patterns as nodes and edges:
 * **Stakes**: user harm, money, reputation, compliance
 * **Lifecycle phase**: discovery/design/build/debug/ops/postmortem
 
-These tags are what make “danger archetype” routing possible later.
+These tags are what make "danger archetype" routing possible later.

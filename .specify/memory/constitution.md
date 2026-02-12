@@ -248,7 +248,7 @@ The following technical decisions are architectural constraints:
 - **Embedding Models**: Version tracking REQUIRED; reproducibility MUST
   be ensured across model updates
 - **ID Strategy**: ULID or UUID for all canonical entities
-- **FSMs**: 10 universal finite-state machines (see FSM-10.md)
+- **FSMs**: 10 universal finite-state machines (see [docs/domain/fsm-catalogue.md](../../docs/domain/fsm-catalogue.md))
 - **Danger Archetypes**: 4 categories (Ambiguity, Adversarial,
   Irreversibility, Institutional)
 

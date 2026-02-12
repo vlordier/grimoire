@@ -1,3 +1,12 @@
+# Qdrant Setup
+
+> Minimal Qdrant client setup: create 3 collections + payload indexes.
+>
+> **See also:** [Storage Mapping](storage-mapping.md) · [Canonical Schemas](canonical-schemas.md) · [Pattern Detection & Pipeline](pattern-detection-and-pipeline.md)
+
+---
+
+```python
 # qdrant_setup.py
 # Minimal Qdrant client setup: create 3 collections + payload indexes.
 #
@@ -30,7 +39,6 @@ def ensure_collections(
     windows_collection: str = "step_windows",
     patterns_collection: str = "patterns",
 ) -> None:
-    # A couple of sane defaults; tune later.
     hnsw = HnswConfigDiff(m=16, ef_construct=200)
     optim = OptimizersConfigDiff(default_segment_number=2)
 
@@ -49,18 +57,17 @@ def ensure_collections(
     create_if_missing(windows_collection)
     create_if_missing(patterns_collection)
 
-    # ---------------------------
-    # Payload indexes (Steps)
-    # ---------------------------
-    # Keyword fields
-    for key in ["step_id", "trace_id", "actor", "role", "fsm_id", "fsm_state", "domain", "tool", "license", "sensitivity"]:
+    # --- Payload indexes (Steps) ---
+    for key in [
+        "step_id", "trace_id", "actor", "role", "fsm_id",
+        "fsm_state", "domain", "tool", "license", "sensitivity",
+    ]:
         client.create_payload_index(
             collection_name=steps_collection,
             field_name=key,
             field_schema=PayloadSchemaType.KEYWORD,
         )
 
-    # Integer fields
     for key in ["index"]:
         client.create_payload_index(
             collection_name=steps_collection,
@@ -68,7 +75,6 @@ def ensure_collections(
             field_schema=PayloadSchemaType.INTEGER,
         )
 
-    # Bool fields
     for key in ["has_tool_call"]:
         client.create_payload_index(
             collection_name=steps_collection,
@@ -76,22 +82,22 @@ def ensure_collections(
             field_schema=PayloadSchemaType.BOOL,
         )
 
-    # Float fields (danger)
-    for key in ["danger_ambiguity", "danger_adversarial", "danger_irreversibility", "danger_institutional"]:
+    for key in [
+        "danger_ambiguity", "danger_adversarial",
+        "danger_irreversibility", "danger_institutional",
+    ]:
         client.create_payload_index(
             collection_name=steps_collection,
             field_name=key,
             field_schema=PayloadSchemaType.FLOAT,
         )
 
-    # "tags" as keyword array; Qdrant indexes array fields with KEYWORD schema.
     client.create_payload_index(
         collection_name=steps_collection,
         field_name="tags",
         field_schema=PayloadSchemaType.KEYWORD,
     )
 
-    # Optional: source fields (arrays)
     for key in ["source_type", "source_id"]:
         client.create_payload_index(
             collection_name=steps_collection,
@@ -99,10 +105,11 @@ def ensure_collections(
             field_schema=PayloadSchemaType.KEYWORD,
         )
 
-    # ---------------------------
-    # Payload indexes (Windows)
-    # ---------------------------
-    for key in ["window_id", "trace_id", "fsm_id", "fsm_state", "domain", "license", "sensitivity"]:
+    # --- Payload indexes (Windows) ---
+    for key in [
+        "window_id", "trace_id", "fsm_id", "fsm_state",
+        "domain", "license", "sensitivity",
+    ]:
         client.create_payload_index(
             collection_name=windows_collection,
             field_name=key,
@@ -122,7 +129,10 @@ def ensure_collections(
         field_schema=PayloadSchemaType.BOOL,
     )
 
-    for key in ["danger_ambiguity", "danger_adversarial", "danger_irreversibility", "danger_institutional"]:
+    for key in [
+        "danger_ambiguity", "danger_adversarial",
+        "danger_irreversibility", "danger_institutional",
+    ]:
         client.create_payload_index(
             collection_name=windows_collection,
             field_name=key,
@@ -135,24 +145,23 @@ def ensure_collections(
         field_schema=PayloadSchemaType.KEYWORD,
     )
 
-    # step_ids is an array of ids; KEYWORD index makes filtering possible (e.g., contains)
     client.create_payload_index(
         collection_name=windows_collection,
         field_name="step_ids",
         field_schema=PayloadSchemaType.KEYWORD,
     )
 
-    # ---------------------------
-    # Payload indexes (Patterns)
-    # ---------------------------
-    for key in ["pattern_id", "type", "name", "fsm_id", "miner_version", "schema_version"]:
+    # --- Payload indexes (Patterns) ---
+    for key in [
+        "pattern_id", "type", "name", "fsm_id",
+        "miner_version", "schema_version",
+    ]:
         client.create_payload_index(
             collection_name=patterns_collection,
             field_name=key,
             field_schema=PayloadSchemaType.KEYWORD,
         )
 
-    # arrays
     for key in ["allowed_states", "domains", "required_tags", "forbidden_tags"]:
         client.create_payload_index(
             collection_name=patterns_collection,
@@ -160,7 +169,6 @@ def ensure_collections(
             field_schema=PayloadSchemaType.KEYWORD,
         )
 
-    # quality fields
     client.create_payload_index(
         collection_name=patterns_collection,
         field_name="quality_support",
@@ -172,10 +180,11 @@ def ensure_collections(
         field_schema=PayloadSchemaType.FLOAT,
     )
 
-    # danger constraints on patterns (optional but useful)
     for key in [
-        "min_danger_ambiguity", "min_danger_adversarial", "min_danger_irreversibility", "min_danger_institutional",
-        "max_danger_ambiguity", "max_danger_adversarial", "max_danger_irreversibility", "max_danger_institutional",
+        "min_danger_ambiguity", "min_danger_adversarial",
+        "min_danger_irreversibility", "min_danger_institutional",
+        "max_danger_ambiguity", "max_danger_adversarial",
+        "max_danger_irreversibility", "max_danger_institutional",
     ]:
         client.create_payload_index(
             collection_name=patterns_collection,
@@ -185,11 +194,8 @@ def ensure_collections(
 
 
 if __name__ == "__main__":
-    # Local Qdrant
     client = QdrantClient(url="http://localhost:6333")
-
-    # Set this to your embedding model dimension
-    EMBED_DIM = 3072  # example; change to your model
-
+    EMBED_DIM = 3072  # change to your model
     ensure_collections(client, dim=EMBED_DIM)
     print("Qdrant collections + payload indexes ensured.")
+```
