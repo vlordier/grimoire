@@ -13,7 +13,7 @@ The FSM Router selects 1 of 10 universal FSM types based on problem intent and c
 
 ### Key Data Flow
 
-```
+```text
 Input: Problem Text
          ↓
     FSM Router
@@ -45,18 +45,23 @@ Output: FSM Type + Confidence [0, 1]
 ### Key Questions
 
 **Q1: What's the minimum confidence threshold to recommend an FSM?**
+
 - A: 0.5 (>50% keyword match). Below 0.5, default to clarify_frame.
 
 **Q2: How do we handle ambiguous problems (e.g., "Make the system better")?**
+
 - A: Lowest confidence, default to clarify_frame (which narrows scope first).
 
 **Q3: Can a problem match multiple FSMs equally well?**
+
 - A: Yes. Return best match; second-best available in response metadata for context.
 
 **Q4: Should FSM selection depend on Danger classification (002)?**
+
 - A: Not hard dependency. Can work independently. Phase 3 optimization: use danger scores to refine FSM.
 
 **Q5: How do we extend keywords/patterns for new domains?**
+
 - A: Config-driven keyword lists in routing_config.yaml. Easy to add without code change.
 
 ---
@@ -143,7 +148,7 @@ RoutingConfig(
 
 ### Module Structure
 
-```
+```text
 grimoire_fsm/
 ├── router.py
 │   ├── FSMRouter (main class)
@@ -169,12 +174,12 @@ def extract_keywords(text: str) -> Dict[str, int]:
     """Count occurrences of FSM keywords in problem text."""
     keywords_matched = defaultdict(int)
     text_lower = text.lower()
-    
+
     for fsm_id, keywords in KEYWORD_PATTERNS.items():
         for keyword in keywords:
             if keyword in text_lower:
                 keywords_matched[fsm_id] += 1
-    
+
     return keywords_matched
 ```
 
@@ -194,20 +199,20 @@ def score_fsm(keywords_matched: int, total_keywords_possible: int) -> float:
 ```python
 def select_fsm(problem_text: str, config: RoutingConfig) -> FSMRoute:
     keywords = extract_keywords(problem_text)
-    
+
     scores = {
         fsm_id: score_fsm(count, len(patterns))
         for fsm_id, count in keywords.items()
         for patterns in [KEYWORD_PATTERNS[fsm_id]]
     }
-    
+
     best_fsm = max(scores, key=scores.get, default=config.default_fsm)
     confidence = scores.get(best_fsm, 0.0)
-    
+
     if confidence < config.confidence_threshold:
         best_fsm = config.default_fsm
         confidence = 0.0  # Indicates default fallback
-    
+
     return FSMRoute(
         selected_fsm_id=best_fsm,
         confidence=confidence,
@@ -218,14 +223,14 @@ def select_fsm(problem_text: str, config: RoutingConfig) -> FSMRoute:
 
 ### API Endpoints
 
-```
+```text
 POST /v1/route
   Request: FSMRouterRequest
   Response: FSMRouterResponse
 
 GET /v1/routing/config
   Response: RoutingConfig
-  
+
 PUT /v1/routing/config
   Request: RoutingConfigUpdate
   Response: RoutingConfig (updated)
@@ -240,6 +245,7 @@ PUT /v1/routing/config
 ### Neo4j Cypher Templates
 
 **Store FSM Classification on Step**
+
 ```cypher
 // Attach FSM classification to Step node
 MATCH (s:Step {step_id: $step_id})
@@ -251,6 +257,7 @@ RETURN s.step_id, s.fsm_type, s.fsm_confidence
 ```
 
 **Query Steps by FSM Type**
+
 ```cypher
 // Find all steps of a specific FSM type
 MATCH (t:Trace)-[:CONTAINS]->(s:Step)
@@ -262,6 +269,7 @@ LIMIT 100
 ```
 
 **Aggregate FSM Distribution**
+
 ```cypher
 // Distribution of FSM types across traces
 MATCH (s:Step)
@@ -273,6 +281,7 @@ ORDER BY count DESC
 ```
 
 **Find Traces by FSM Type for Pattern Extraction**
+
 ```cypher
 // Get complete traces of specific FSM type (for Phase 3.1)
 MATCH (t:Trace)-[:CONTAINS]->(s:Step)
@@ -296,12 +305,12 @@ from watchdog.events import FileSystemEventHandler
 
 class ConfigReloader(FileSystemEventHandler):
     """Hot-reload routing configuration."""
-    
+
     def __init__(self, config_path: str, router: FSMRouter):
         self.config_path = config_path
         self.router = router
         self.last_reload = 0
-    
+
     def on_modified(self, event):
         if event.src_path == self.config_path:
             # Debounce: wait 500ms after last change
@@ -309,16 +318,16 @@ class ConfigReloader(FileSystemEventHandler):
             if current_time - self.last_reload > 0.5:
                 self.last_reload = current_time
                 asyncio.create_task(self.reload_config())
-    
+
     async def reload_config(self):
         """Reload configuration without restart."""
         try:
             async with aiofiles.open(self.config_path, 'r') as f:
                 content = await f.read()
-            
+
             new_config = yaml.safe_load(content)
             self.router.update_config(RoutingConfig(**new_config))
-            
+
             logger.info(f"Reloaded routing config: {len(new_config['fsm_keyword_patterns'])} FSMs")
         except Exception as e:
             logger.error(f"Failed to reload config: {e}")
@@ -360,10 +369,10 @@ def resolve_tie(scores: Dict[str, float], keywords_matched: Dict[str, List[str]]
     """
     max_score = max(scores.values())
     tied_fsms = [fsm for fsm, score in scores.items() if score == max_score]
-    
+
     if len(tied_fsms) == 1:
         return tied_fsms[0]
-    
+
     # 1. Most specific (most keywords)
     keyword_counts = {
         fsm: len(keywords_matched.get(fsm, [])) 
@@ -372,10 +381,10 @@ def resolve_tie(scores: Dict[str, float], keywords_matched: Dict[str, List[str]]
     max_keywords = max(keyword_counts.values())
     most_specific = [fsm for fsm, count in keyword_counts.items() 
                      if count == max_keywords]
-    
+
     if len(most_specific) == 1:
         return most_specific[0]
-    
+
     # 2. Priority order
     FSM_PRIORITY = [
         "fsm_diagnose_fix",
@@ -385,11 +394,11 @@ def resolve_tie(scores: Dict[str, float], keywords_matched: Dict[str, List[str]]
         "fsm_transform",
         "fsm_clarify_frame"
     ]
-    
+
     for priority_fsm in FSM_PRIORITY:
         if priority_fsm in most_specific:
             return priority_fsm
-    
+
     # 3. Deterministic fallback
     return most_specific[0]
 ```
@@ -405,13 +414,13 @@ def test_keyword_extraction():
     text = "Debug why the async task times out"
     keywords = extract_keywords(text)
     assert keywords["fsm_diagnose_fix"] > 0
-    
+
 def test_clarity_problem_defaults_to_clarify_frame():
     text = "Do something good"  # Vague
     route = router.route(text)
     assert route.selected_fsm_id == "fsm_clarify_frame"
     assert route.confidence == 0.0  # Below threshold
-    
+
 def test_design_problem_routes_to_design_decide():
     text = "Architect a new database schema"
     route = router.route(text)
@@ -429,7 +438,7 @@ def test_fsm_routing_with_phase1_traces():
     # - 90%+ get routed (not defaulted)
     # - Routing correlates with problem domain
     # - Performance < 100ms per trace
-    
+
 def test_fsm_selection_consistency():
     # Same problem routed twice = same FSM
     # Verify deterministic (no randomness)
@@ -459,6 +468,7 @@ def test_fsm_selection_consistency():
 ### Handoff to Phase 3
 
 Once 003 is complete:
+
 - FSM Router API available
 - Can be called to select FSM for any reasoning trace
 - Confidence scores help Phase 3 identify uncertain cases for human review

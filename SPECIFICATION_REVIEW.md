@@ -10,6 +10,7 @@
 ## Executive Summary
 
 This document provides a comprehensive review of all 8 feature specifications, identifying:
+
 - ✅ **Strengths**: Well-structured, clear dependencies, comprehensive data models
 - ⚠️ **Gaps**: Minor inconsistencies, missing integration details
 - 🔧 **Recommendations**: Specific improvements for implementation readiness
@@ -30,6 +31,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
 | Integration | ✅ Ready | Production-ready, tested |
 
 **Key Strengths**:
+
 - Canonical schemas (`TraceBundle`, `Step`, `Edge`) are well-defined
 - Neo4j + Qdrant storage mapping is clear
 - All Pydantic v2 models validated
@@ -48,6 +50,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
 | Integration | ⚠️ Needs Detail | How scores attach to Neo4j Step nodes |
 
 **Strengths**:
+
 - Clear 4-danger taxonomy (ambiguity, adversarial, irreversibility, institutional)
 - Keyword-based MVP approach is pragmatic
 - Evidence spans provide explainability
@@ -58,6 +61,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Current: "Store danger scores on Neo4j Step nodes"
    - Missing: Exact Cypher query for updating scores
    - **Recommendation**: Add Cypher template:
+
    ```cypher
    MATCH (s:Step {step_id: $step_id})
    SET s.danger_ambiguity = $ambiguity,
@@ -91,6 +95,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
 | Integration | ⚠️ Needs Detail | Hot-reload config mechanism |
 
 **Strengths**:
+
 - 10 FSM types cover reasoning space well
 - Config-driven approach enables customization
 - Confidence scoring with alternatives is robust
@@ -101,6 +106,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Current: "Hot-loadable config"
    - Missing: Mechanism for reloading without restart
    - **Recommendation**: Add file watcher or API endpoint:
+
    ```python
    @app.post("/v1/config/reload")
    async def reload_config():
@@ -133,6 +139,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
 | Integration | ⚠️ Needs Detail | Aggregation logic specifics |
 
 **Strengths**:
+
 - 4 guard types cover safety requirements
 - Aggregated decision simplifies consumption
 - Escalation path is clear
@@ -143,6 +150,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Current: "Internal" consumption
    - Missing: REST endpoint for external guard checks
    - **Recommendation**: Add API:
+
    ```python
    @app.post("/v1/guards/check")
    async def check_transition(request: GuardCheckRequest) -> GuardDecision:
@@ -165,6 +173,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Current: Single-step guards
    - Missing: Multi-step context (e.g., "requires VERIFICATION step before")
    - **Recommendation**: Add trace context to GuardCheckRequest:
+
    ```python
    class GuardCheckRequest(BaseModel):
        current_step: Step
@@ -185,6 +194,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
 | Integration | ⚠️ Needs Detail | Neo4j subgraph query specifics |
 
 **Strengths**:
+
 - gSpan algorithm choice is well-researched
 - Fuzzy deduplication (90% accuracy target) is realistic
 - Cost profiling enables ranking
@@ -195,6 +205,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Current: "Query Neo4j for subgraphs"
    - Missing: Exact Cypher for pattern extraction
    - **Recommendation**: Add query template:
+
    ```cypher
    // Extract candidate patterns from traces
    MATCH (t:Trace)-[:CONTAINS]->(s:Step)-[:FOLLOWS*1..5]->(next:Step)
@@ -210,6 +221,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Current: "SHA256 hash of canonical form"
    - Missing: Canonical form definition
    - **Recommendation**: Define canonical form:
+
    ```python
    def canonical_form(pattern: Pattern) -> str:
        """Sort nodes by degree, edges by (src, dst, type)"""
@@ -237,6 +249,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
 | Integration | ✅ Complete | Clear Phase 2 integration |
 
 **Strengths**:
+
 - Multi-objective scoring formula is well-defined
 - Phase 2 integration is explicit
 - Score breakdown provides explainability
@@ -247,6 +260,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Current: Fixed weights (0.4, 0.3, 0.2, 0.1)
    - Missing: How to tune weights based on domain
    - **Recommendation**: Add domain-specific overrides:
+
    ```python
    DOMAIN_WEIGHTS = {
        "security": {"safety": 0.5, "effectiveness": 0.3, "cost": 0.1, "relevance": 0.1},
@@ -259,6 +273,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Current: Requires 5+ feedback events
    - Missing: How to rank new patterns
    - **Recommendation**: Add cold-start handling:
+
    ```python
    if feedback_count < 5:
        # Use similarity to ranked patterns
@@ -269,6 +284,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Current: "<30ms for 1000 patterns"
    - Missing: Caching approach for 1M patterns
    - **Recommendation**: Add Redis caching for top-K patterns per FSM type:
+
    ```python
    cache_key = f"ranked_patterns:{fsm_type}:{domain}"
    cached = redis.get(cache_key)
@@ -290,6 +306,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
 | Integration | ⚠️ Needs Detail | Event bus mechanism |
 
 **Strengths**:
+
 - CUSUM for drift detection is statistically sound
 - A/B testing with auto-promotion is production-ready
 - Pattern lifecycle management is comprehensive
@@ -301,6 +318,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Missing: Event bus technology choice
    - **Recommendation**: Add options comparison:
    | Technology | Pros | Cons | Recommendation |
+
    |------------|------|------|------------------|
    | Redis Streams | Simple, existing infra | Limited persistence | **Use for MVP** |
    | Kafka | Scalable, durable | Complex ops | Future upgrade |
@@ -310,6 +328,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Current: "K=50 buffered"
    - Missing: Overflow handling
    - **Recommendation**: Add overflow strategy:
+
    ```python
    if buffer_size >= MAX_BUFFER:
        # Option 1: Drop oldest (current)
@@ -324,6 +343,7 @@ This document provides a comprehensive review of all 8 feature specifications, i
    - Current: "Alert escalates if drift persists >3 days"
    - Missing: Alert frequency
    - **Recommendation**: Add alert throttling:
+
    ```python
    last_alert = get_last_drift_alert(pattern_id)
    if drift_detected and (now - last_alert) > timedelta(hours=24):
@@ -391,10 +411,11 @@ This document provides a comprehensive review of all 8 feature specifications, i
 **Gap**: Exact mechanism for passing scores
 
 **Recommendation**: Define data flow:
-```
+
+```text
 Phase 2 (Danger Router) 
   → Writes to Neo4j: (Step)-[:HAS_DANGER_SCORE]->(DangerScore)
-  
+
 Phase 3 (Pattern Ranking)
   → Reads from Neo4j: MATCH (p:Pattern)-[:CONTAINS_STEP]->(s:Step)-[:HAS_DANGER_SCORE]->(d:DangerScore)
   → Aggregates: avg(d.danger_ambiguity) as pattern_ambiguity
@@ -407,7 +428,8 @@ Phase 3 (Pattern Ranking)
 **Gap**: How does feedback reach Pattern Ranking?
 
 **Recommendation**: Define event flow:
-```
+
+```text
 Pattern Execution → FeedbackEvent → Event Bus → Optimization Loop 
   → Re-rank Trigger → Pattern Ranking API → Updated Scores → Neo4j
 ```
@@ -419,6 +441,7 @@ Pattern Execution → FeedbackEvent → Event Bus → Optimization Loop
 **Gap**: How is traffic split determined?
 
 **Recommendation**: Add routing logic:
+
 ```python
 def route_to_variant(pattern_id: str, experiment_id: str, user_id: str) -> str:
     """Deterministic routing based on hash"""
@@ -481,6 +504,7 @@ def route_to_variant(pattern_id: str, experiment_id: str, user_id: str) -> str:
 **Overall Status**: ✅ **READY FOR IMPLEMENTATION**
 
 All 8 features have comprehensive specifications with:
+
 - Clear user stories and acceptance criteria
 - Well-defined data models (Pydantic v2)
 - API contracts with request/response schemas
@@ -488,18 +512,21 @@ All 8 features have comprehensive specifications with:
 - Integration points documented
 
 **Critical Path**:
+
 1. Phase 2 can start immediately (002, 003, 004)
 2. Phase 3.1 (005) can start after Phase 1
 3. Phase 3.2 (006) can start after Phase 2 + 3.1
 4. Phase 3.3 (008) can start after Phase 3.2
 
 **Risk Assessment**: **LOW**
+
 - No architectural blockers
 - Clear dependencies
 - Well-researched algorithms
 - Comprehensive specifications
 
 **Next Steps**:
+
 1. Address 3 immediate actions (REST API for 004, Event Bus for 008, Cypher templates)
 2. Begin Phase 2 implementation
 3. Set up CI/CD for cross-feature integration testing

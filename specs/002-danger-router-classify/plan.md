@@ -32,10 +32,12 @@
 ### 1.1 Data Models (Pydantic v2)
 
 **Existing Models** (from Canonical Schemas):
+
 - `DangerType` enum: ambiguity, adversarial, irreversibility, institutional
 - `DangerScores` (BaseModel): scores dict + evidence
 
 **New Models** (for this feature):
+
 - `DangerClassifierRequest`: trace_text, step_role, context
 - `DangerClassifierResponse`: 4 scores + evidence spans
 - `GuardDecision`: allowed (bool), reason, escalation_path
@@ -44,6 +46,7 @@
 ### 1.2 API Contract
 
 **Core Functions**:
+
 ```python
 def classify_trace(trace: Trace) -> DangerScores
 def classify_step(step: Step, trace_context: Trace) -> DangerScores
@@ -61,6 +64,7 @@ def check_transition(
 ### 2.1 Danger Classifier Module
 
 **Components**:
+
 1. **Keyword Detector** (regex-based)
    - ambiguity keywords: "unclear", "maybe", "probably", "assume"
    - adversarial keywords: "bypass", "exploit", "circumvent", "attack"
@@ -106,6 +110,7 @@ def check_transition(
 #### Neo4j Cypher Templates
 
 **Store Danger Scores on Step**
+
 ```cypher
 // Attach danger scores to Step node
 MATCH (s:Step {step_id: $step_id})
@@ -119,6 +124,7 @@ RETURN s.step_id, s.danger_ambiguity, s.danger_adversarial
 ```
 
 **Query Steps by Danger Level**
+
 ```cypher
 // Find high-risk steps for review
 MATCH (s:Step)
@@ -138,6 +144,7 @@ LIMIT 100
 ```
 
 **Store Guard Block Decision**
+
 ```cypher
 // Record when guard blocks a transition
 MATCH (s:Step {step_id: $step_id})
@@ -154,6 +161,7 @@ RETURN g.decision_id
 ```
 
 **Query Blocked Steps with Context**
+
 ```cypher
 // Get blocked steps with trace context
 MATCH (t:Trace)-[:CONTAINS]->(s:Step)-[:BLOCKED_BY_GUARD]->(g:GuardDecision)
@@ -168,6 +176,7 @@ ORDER BY g.computed_at DESC
 ```
 
 **Aggregate Danger Statistics**
+
 ```cypher
 // Daily danger score distribution
 MATCH (s:Step)
@@ -204,6 +213,7 @@ qdrant_client.set_payload(
 ### 2.4 Configuration
 
 **Configurable Parameters** (in `classifier_config.yaml`):
+
 ```yaml
 # Keyword lists (can be extended)
 ambiguity_keywords: [unclear, maybe, probably, ...]
@@ -233,12 +243,14 @@ decision_multiplier: 1.2
 ### 3.1 Unit Tests
 
 **Test Coverage**:
+
 - Keyword detection (each keyword triggers correctly)
 - Scoring logic (monotonic, bounded [0, 1])
 - Guard logic (each guard blocks/allows correctly)
 - Edge cases (empty text, null context, mixed signals)
 
 **Example Test Cases**:
+
 ```python
 def test_ambiguity_high_score():
     text = "Make this faster somehow"
@@ -286,6 +298,7 @@ def test_institutional_escalation():
 ### 4.2 Phase 3 Handoff
 
 Pass to Phase 3 (Pattern Mining) with:
+
 - ✅ Danger scores for all historical traces
 - ✅ Guard evidence logs  
 - ✅ Tuned thresholds (production-ready)
@@ -295,7 +308,7 @@ Pass to Phase 3 (Pattern Mining) with:
 
 ## Files to Create
 
-```
+```text
 specs/002-danger-router-classify/
 ├── spec.md ✅
 ├── plan.md ✅ (this file)

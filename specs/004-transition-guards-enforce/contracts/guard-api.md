@@ -23,7 +23,7 @@ REST API for checking transition safety across all 4 guard types. Aggregates ind
 
 Evaluate all guards for a proposed step transition.
 
-```
+```text
 POST /guards/check
 ```
 
@@ -46,43 +46,43 @@ class StepRole(str, Enum):
 
 class GuardCheckRequest(BaseModel):
     """Request to check if a transition is allowed."""
-    
+
     trace_id: str = Field(
         description="Trace identifier"
     )
-    
+
     current_step_id: str = Field(
         description="Current step being evaluated"
     )
-    
+
     proposed_role: StepRole = Field(
         description="Proposed role for the next step"
     )
-    
+
     # Phase 2.1 inputs
     danger_scores: Optional[dict] = Field(
         default=None,
         description="Danger scores from Phase 2.1 (if pre-computed)"
     )
-    
+
     # Phase 2.2 inputs
     fsm_classification: Optional[dict] = Field(
         default=None,
         description="FSM classification from Phase 2.2"
     )
-    
+
     # Trace context for multi-step guards
     trace_history: Optional[List[dict]] = Field(
         default=None,
         description="Previous steps in trace (for context-aware guards)"
     )
-    
+
     # User context
     user_id: Optional[str] = Field(
         default=None,
         description="User requesting the transition"
     )
-    
+
     execution_context: Optional[dict] = Field(
         default=None,
         description="Additional context (domain, environment, etc.)"
@@ -114,7 +114,7 @@ class GuardCheckRequest(BaseModel):
 ```python
 class GuardDecisionDetail(BaseModel):
     """Individual guard decision."""
-    
+
     guard_name: str = Field(
         description="Name of the guard"
     )
@@ -134,52 +134,52 @@ class GuardDecisionDetail(BaseModel):
 
 class GuardCheckResponse(BaseModel):
     """Aggregated guard check response."""
-    
+
     trace_id: str = Field(
         description="Trace being evaluated"
     )
-    
+
     current_step_id: str = Field(
         description="Step being evaluated"
     )
-    
+
     proposed_role: str = Field(
         description="Proposed role"
     )
-    
+
     # Aggregated decision
     decision: str = Field(
         description="Final decision: ALLOW, BLOCK, WARN, or ESCALATE"
     )
-    
+
     allowed: bool = Field(
         description="Whether transition is allowed"
     )
-    
+
     reason: str = Field(
         description="Primary reason for decision"
     )
-    
+
     required_approvers: Optional[List[str]] = Field(
         default=None,
         description="Approvers required (if ESCALATE)"
     )
-    
+
     monitoring_flags: Optional[List[str]] = Field(
         default=None,
         description="Flags for monitoring (if WARN/ESCALATE)"
     )
-    
+
     # Individual guard decisions
     guard_decisions: List[GuardDecisionDetail] = Field(
         description="Decisions from each guard"
     )
-    
+
     # Metadata
     computed_at: str = Field(
         description="ISO8601 timestamp"
     )
-    
+
     processing_ms: int = Field(
         description="Processing time in milliseconds"
     )
@@ -268,7 +268,7 @@ class GuardCheckResponse(BaseModel):
 
 Check multiple transitions in a single request.
 
-```
+```text
 POST /guards/check/batch
 ```
 
@@ -277,12 +277,12 @@ POST /guards/check/batch
 ```python
 class GuardCheckBatchRequest(BaseModel):
     """Batch request for guard checks."""
-    
+
     checks: List[GuardCheckRequest] = Field(
         max_length=100,
         description="Up to 100 checks per batch"
     )
-    
+
     parallel: bool = Field(
         default=True,
         description="Whether to process in parallel"
@@ -313,15 +313,15 @@ class GuardCheckBatchRequest(BaseModel):
 ```python
 class GuardCheckBatchResponse(BaseModel):
     """Batch response."""
-    
+
     results: List[GuardCheckResponse] = Field(
         description="Results for each check"
     )
-    
+
     failed: List[dict] = Field(
         description="Failed checks with error details"
     )
-    
+
     total_ms: int = Field(
         description="Total processing time"
     )
@@ -353,7 +353,7 @@ class GuardCheckBatchResponse(BaseModel):
 
 Retrieve current guard thresholds and rules.
 
-```
+```text
 GET /guards/config
 ```
 
@@ -403,7 +403,7 @@ GET /guards/config
 
 Update thresholds (requires admin role).
 
-```
+```text
 PUT /guards/config
 ```
 
@@ -451,16 +451,17 @@ PRIORITY_ORDER = {
 
 def aggregate_decisions(guard_decisions: List[GuardDecision]) -> str:
     """Aggregate individual guard decisions."""
-    
+
     # Collect all decisions
     decisions = [gd.decision for gd in guard_decisions]
-    
+
     # Return highest priority decision
     highest = max(decisions, key=lambda d: PRIORITY_ORDER[d])
     return highest
 ```
 
 **Rules**:
+
 - If ANY guard returns BLOCK → final decision is BLOCK
 - If ANY guard returns ESCALATE (and none BLOCK) → ESCALATE
 - If ANY guard returns WARN (and none BLOCK/ESCALATE) → WARN

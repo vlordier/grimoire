@@ -1,11 +1,12 @@
 # Implementation Plan: 007-Optimization-Loop
 
 ## Overview
+
 Build a closed-loop feedback system that continuously improves pattern rankings through execution monitoring, drift detection, and A/B testing.
 
 ## Architecture
 
-```
+```text
 ┌────────────────────────────────────────┐
 │ Pattern Execution (Phases 3.1-3.2)     │
 │ - Run pattern on trace                 │
@@ -51,9 +52,11 @@ Build a closed-loop feedback system that continuously improves pattern rankings 
 ## Phases
 
 ### Phase 1: Design & Data Models (Days 1-2)
+
 **Deliverables**: Pydantic models, database schema, event design
 
 **Tasks**:
+
 1. Define FeedbackEvent model (Pydantic v2)
    - Fields: pattern_id, trace_id, success, outcome_quality, user_satisfaction, latency_ms, memory_mb, error_code, timestamp, user_context
    - Validation: quality (0-10), satisfaction (0-5), latency ≥ 0
@@ -76,9 +79,11 @@ Build a closed-loop feedback system that continuously improves pattern rankings 
 6. Design feedback event buffer (in-memory ring buffer + persistent queue)
 
 ### Phase 2: Feedback Pipeline (Days 2-4)
+
 **Deliverables**: Event collection, buffering, deduplication, storage
 
 **Tasks**:
+
 1. Implement FeedbackCollector async service
    - POST /v1/feedback (non-blocking, buffered)
    - Deduplication: (trace_id + pattern_id) → only latest event
@@ -101,9 +106,11 @@ Build a closed-loop feedback system that continuously improves pattern rankings 
    - Verify 90-day retention policy
 
 ### Phase 3: Drift Detection & Re-Ranking (Days 4-6)
+
 **Deliverables**: Concept drift metrics, re-ranking triggers, Phase 3.2 integration
 
 **Tasks**:
+
 1. Implement ConceptDriftDetector
    - Query 30-day window metrics (success_rate, quality, cost)
    - Query 30-60 day window metrics
@@ -131,9 +138,11 @@ Build a closed-loop feedback system that continuously improves pattern rankings 
    - Verify re-ranking triggered with new scores
 
 ### Phase 4: A/B Testing Framework (Days 6-7)
+
 **Deliverables**: Experiment creation, routing logic, statistical testing
 
 **Tasks**:
+
 1. Implement ABExperimentManager
    - Create experiment: pattern_id, version_a, version_b, traffic_split (default 50/50)
    - Validate: min sample size (500+), min duration (7 days)
@@ -160,9 +169,11 @@ Build a closed-loop feedback system that continuously improves pattern rankings 
    - Verify statistical significance calculated correctly
 
 ### Phase 5: Pattern Lifecycle & Monitoring (Days 7-8)
+
 **Deliverables**: Deprecation logic, audit trail, monitoring dashboard
 
 **Tasks**:
+
 1. Implement pattern deprecation
    - Query patterns with effectiveness_score < 0.3 for 60+ days
    - Auto-deprecate with reason "low_effectiveness_aged"
@@ -207,7 +218,7 @@ Build a closed-loop feedback system that continuously improves pattern rankings 
 
 ### Event Bus Design
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                     EVENT BUS (Redis Streams)                   │
 ├─────────────────────────────────────────────────────────────────┤
@@ -247,7 +258,7 @@ from datetime import datetime
 
 class BusEvent(BaseModel):
     """Base event for event bus."""
-    
+
     event_id: str = Field(
         default_factory=lambda: f"evt_{uuid.uuid4().hex[:16]}"
     )
@@ -270,21 +281,21 @@ class BusEvent(BaseModel):
 
 class FeedbackBusEvent(BusEvent):
     """Feedback event for event bus."""
-    
+
     event_type: Literal["FEEDBACK"] = "FEEDBACK"
     stream: str = "grimoire:feedback:events"
     payload: FeedbackEvent
 
 class DriftBusEvent(BusEvent):
     """Drift alert event."""
-    
+
     event_type: Literal["DRIFT_DETECTED"] = "DRIFT_DETECTED"
     stream: str = "grimoire:drift:alerts"
     payload: ConceptDriftAlert
 
 class ABTestBusEvent(BusEvent):
     """A/B test routing event."""
-    
+
     event_type: Literal["EXPERIMENT_ROUTING"] = "EXPERIMENT_ROUTING"
     stream: str = "grimoire:ab:experiments"
     payload: dict = Field(
@@ -297,10 +308,10 @@ class ABTestBusEvent(BusEvent):
 ```python
 class EventBusProducer:
     """Produce events to Redis Streams."""
-    
+
     def __init__(self, redis_client: redis.Redis):
         self.redis = redis_client
-    
+
     async def publish_feedback(
         self, 
         feedback: FeedbackEvent,
@@ -311,21 +322,21 @@ class EventBusProducer:
             payload=feedback.dict(),
             metadata=metadata
         )
-        
+
         event_id = self.redis.xadd(
             "grimoire:feedback:events",
             event.dict(),
             maxlen=100000  # Keep last 100K events
         )
         return event_id
-    
+
     async def publish_drift_alert(
         self,
         alert: ConceptDriftAlert
     ) -> str:
         """Publish drift alert."""
         event = DriftBusEvent(payload=alert.dict())
-        
+
         event_id = self.redis.xadd(
             "grimoire:drift:alerts",
             event.dict(),
@@ -339,7 +350,7 @@ class EventBusProducer:
 ```python
 class EventBusConsumer:
     """Consume events from Redis Streams."""
-    
+
     def __init__(
         self,
         redis_client: redis.Redis,
@@ -349,7 +360,7 @@ class EventBusConsumer:
         self.redis = redis_client
         self.group = consumer_group
         self.name = consumer_name
-    
+
     async def consume_feedback(
         self,
         handler: Callable[[FeedbackEvent], Awaitable[None]],
@@ -365,17 +376,17 @@ class EventBusConsumer:
                 count=batch_size,
                 block=5000  # 5 second timeout
             )
-            
+
             for stream, events in messages:
                 for event_id, fields in events:
                     try:
                         # Parse event
                         event = FeedbackBusEvent(**fields)
                         feedback = FeedbackEvent(**event.payload)
-                        
+
                         # Process
                         await handler(feedback)
-                        
+
                         # Acknowledge
                         self.redis.xack(
                             "grimoire:feedback:events",
@@ -385,7 +396,7 @@ class EventBusConsumer:
                     except Exception as e:
                         # Log error, don't ack (will be retried)
                         logger.error(f"Failed to process {event_id}: {e}")
-    
+
     async def claim_pending(
         self,
         min_idle_time: int = 60000  # 60 seconds
@@ -397,7 +408,7 @@ class EventBusConsumer:
             min=min_idle_time,
             count=10
         )
-        
+
         for item in pending:
             # Claim and reprocess
             claimed = self.redis.xclaim(
@@ -415,7 +426,7 @@ class EventBusConsumer:
 ```python
 class FeedbackBuffer:
     """In-memory buffer with overflow protection."""
-    
+
     def __init__(
         self,
         max_size: int = 50,
@@ -424,7 +435,7 @@ class FeedbackBuffer:
         self.buffer = deque(maxlen=max_size)
         self.overflow_strategy = overflow_strategy
         self.dropped_count = 0
-    
+
     async def add(self, event: FeedbackEvent) -> bool:
         """Add event to buffer."""
         if len(self.buffer) >= self.max_size:
@@ -436,15 +447,15 @@ class FeedbackBuffer:
             elif self.overflow_strategy == "alert":
                 await alert_ops("feedback_buffer_full")
                 return False
-        
+
         self.buffer.append(event)
         return True
-    
+
     async def flush(self):
         """Flush buffer to event bus."""
         batch = list(self.buffer)
         self.buffer.clear()
-        
+
         # Publish to Redis
         for event in batch:
             await self.producer.publish_feedback(event)
@@ -468,6 +479,7 @@ EVENT_BUS_METRICS = {
 ## Dependencies
 
 ### Internal Dependencies
+
 - **Phase 1 (Canonical Schema)**: Pattern, TraceBundle models
 - **Phase 2.1 (Danger)**: Consider danger scores in deprecation policy
 - **Phase 2.2 (FSM)**: Segment drift detection by FSM type
@@ -475,6 +487,7 @@ EVENT_BUS_METRICS = {
 - **Phase 3.2 (Ranking)**: Re-rank API, RankedPattern model
 
 ### External Dependencies
+
 - **Neo4j 5.x**: Graph persistence, pattern versioning relationships
 - **Redis 7.x**: Event bus (streams), caching
 - **Pydantic v2**: Data validation
@@ -530,11 +543,13 @@ EVENT_BUS_METRICS = {
 ## Handoff Outputs
 
 **Outputs to Future Phases**:
+
 - FeedbackEvent + ConceptDriftAlert data (for Phase 3.4 ML-based pattern retraining)
 - A/B experiment results + winner patterns (for Phase 4 recommendations)
 - Audit trail (for compliance + knowledge reuse)
 
 **Inputs Used**:
+
 - Pattern execution results (Phase 3.1-3.2)
 - Danger/FSM context (Phase 2.1-2.2)
 - Ranking API (Phase 3.2)

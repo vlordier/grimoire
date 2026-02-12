@@ -19,7 +19,7 @@ This document defines the complete integration architecture for Grimoire's 8-fea
 
 ## System Overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           GRIMOIRE SYSTEM                                   │
 │                    Continuously Improving Reasoning Engine                    │
@@ -93,7 +93,7 @@ This document defines the complete integration architecture for Grimoire's 8-fea
 
 ### 1. Ingestion Flow (Phase 1)
 
-```
+```text
 HuggingFace Dataset
        │
        ▼
@@ -116,11 +116,13 @@ HuggingFace Dataset
 ```
 
 **Key Data Models**:
+
 - `TraceBundle`: Container with Trace + Steps + Edges
 - `Step`: Individual reasoning step with embeddings
 - `Edge`: Relationships between steps
 
 **Storage Mapping**:
+
 | Entity | Neo4j | Qdrant | S3 |
 |--------|-------|--------|-----|
 | Trace | Node (`Trace`) | - | Raw JSON |
@@ -132,7 +134,7 @@ HuggingFace Dataset
 
 ### 2. Classification Flow (Phase 2)
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         CLASSIFICATION PIPELINE                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -208,7 +210,7 @@ Step/Trace Text
 
 ### 3. Learning Flow (Phase 3)
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         LEARNING PIPELINE                                   │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -327,7 +329,7 @@ Phase 1 Traces (Neo4j)
 
 ### Cross-Feature API Dependencies
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         API DEPENDENCY GRAPH                                │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -426,7 +428,7 @@ Phase 1                    Phase 2                    Phase 3
 
 ### Feedback Loop Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         EVENT-DRIVEN FEEDBACK                               │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -463,6 +465,7 @@ Pattern Execution
 ```
 
 **Event Types**:
+
 1. `pattern.executed` → Update execution count
 2. `pattern.succeeded` → Update success rate
 3. `pattern.failed` → Update error rate + alert
@@ -504,7 +507,7 @@ Pattern Execution
 
 ### Service Topology
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         DEPLOYMENT VIEW                                     │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -596,7 +599,7 @@ circuit_breakers:
 
 ### Distributed Tracing
 
-```
+```text
 Trace ID: trace-001-abcd
 ├── Phase 1: Ingestion (5 min)
 ├── Phase 2: Classification (50ms)
@@ -614,7 +617,7 @@ Trace ID: trace-001-abcd
 
 ### Implementation Order
 
-```
+```text
 Phase 1: Foundation ✅
 ├── 001: Canonical Schema (COMPLETE)
 
@@ -702,6 +705,7 @@ class FeedbackEvent(BaseModel):
 | 1.0 | 2026-02-12 | AI Assistant | Initial integration architecture |
 
 **Next Steps**
+
 1. Review individual feature specifications
 2. Define detailed integration test cases
 3. Create service interface definitions

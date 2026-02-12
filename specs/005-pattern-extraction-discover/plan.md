@@ -58,7 +58,7 @@ PatternMatch(trace_id, pattern_id):
 
 ### Algorithm: Subgraph Matching
 
-```
+```text
 For each trace in Phase 1 data:
   1. Extract step sequence (observations → plans → executions)
   2. For each candidate pattern:
@@ -70,7 +70,7 @@ For each trace in Phase 1 data:
      - success_count = # matches where outcome=success
      - total_uses = # matches
      - success_rate = success_count / total_uses
-     
+
 Deduplication:
   1. For each pattern:
      - Compute similarity to all other patterns (edit distance)
@@ -119,6 +119,7 @@ Deduplication:
 ### Neo4j Cypher Templates
 
 **Extract Candidate Patterns from Traces**
+
 ```cypher
 // Find frequent step sequences (gSpan candidate generation)
 MATCH (t:Trace)-[:CONTAINS]->(s:Step)
@@ -136,6 +137,7 @@ LIMIT 1000
 ```
 
 **Find Traces with Similar Step Sequences**
+
 ```cypher
 // Match traces with similar step patterns
 MATCH (t1:Trace)-[:CONTAINS]->(s1:Step)
@@ -160,6 +162,7 @@ LIMIT 50
 ```
 
 **Store Extracted Pattern**
+
 ```cypher
 // Create Pattern node with metadata
 CREATE (p:Pattern {
@@ -191,6 +194,7 @@ RETURN p.pattern_id
 ```
 
 **Query Patterns by FSM Type**
+
 ```cypher
 // Get patterns for specific FSM type
 MATCH (p:Pattern)
@@ -205,6 +209,7 @@ LIMIT 100
 ```
 
 **Link Pattern to Source Traces**
+
 ```cypher
 // Create relationships from pattern to matching traces
 MATCH (p:Pattern {pattern_id: $pattern_id})
@@ -217,6 +222,7 @@ CREATE (p)-[:MATCHES_TRACE {
 ```
 
 **Find Similar Patterns (for Deduplication)**
+
 ```cypher
 // Find patterns with similar structure
 MATCH (p1:Pattern)-[:HAS_STEP]->(ps1:PatternStep)
@@ -244,6 +250,7 @@ ORDER BY similarity DESC
 ```
 
 **Merge Duplicate Patterns**
+
 ```cypher
 // Merge pattern2 into pattern1
 MATCH (p1:Pattern {pattern_id: $keep_pattern_id})
@@ -273,7 +280,7 @@ RETURN p1.pattern_id, p1.num_matching_traces
 def compute_canonical_hash(pattern: Pattern) -> str:
     """
     Compute deterministic hash for pattern deduplication.
-    
+
     Canonical form:
     1. Sort steps by order
     2. Normalize content (lowercase, remove whitespace)
@@ -282,7 +289,7 @@ def compute_canonical_hash(pattern: Pattern) -> str:
     """
     import json
     import hashlib
-    
+
     # Build canonical representation
     canonical = {
         "fsm_types": sorted(pattern.fsm_types),
@@ -295,10 +302,10 @@ def compute_canonical_hash(pattern: Pattern) -> str:
             for step in sorted(pattern.steps, key=lambda s: s.order)
         ]
     }
-    
+
     # Create deterministic JSON
     canonical_json = json.dumps(canonical, sort_keys=True, separators=(',', ':'))
-    
+
     # Hash
     return hashlib.sha256(canonical_json.encode()).hexdigest()
 
@@ -306,7 +313,7 @@ def compute_canonical_hash(pattern: Pattern) -> str:
 def are_patterns_equivalent(p1: Pattern, p2: Pattern, threshold: float = 0.9) -> bool:
     """
     Check if two patterns are equivalent (for deduplication).
-    
+
     Uses:
     1. Exact hash match (fast path)
     2. Graph edit distance (if hashes differ but close)
@@ -314,18 +321,18 @@ def are_patterns_equivalent(p1: Pattern, p2: Pattern, threshold: float = 0.9) ->
     # Fast path: exact hash match
     if p1.canonical_hash == p2.canonical_hash:
         return True
-    
+
     # Slow path: structural similarity
     # Compute Jaccard similarity of step roles
     roles1 = set(s.role for s in p1.steps)
     roles2 = set(s.role for s in p2.steps)
-    
+
     intersection = len(roles1 & roles2)
     union = len(roles1 | roles2)
-    
+
     if union == 0:
         return False
-    
+
     jaccard = intersection / union
     return jaccard >= threshold
 ```
@@ -338,9 +345,9 @@ def calculate_min_support(total_traces: int,
                          ratio_threshold: float = 0.01) -> int:
     """
     Calculate minimum support threshold for pattern mining.
-    
+
     Formula: max(base_threshold, total_traces * ratio_threshold)
-    
+
     Examples:
     - 100 traces → max(5, 1) = 5
     - 10,000 traces → max(5, 100) = 100
