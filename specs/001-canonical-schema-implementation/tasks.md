@@ -20,7 +20,7 @@ This document defines all implementation tasks for Feature 001 in dependency ord
 
 ## 📋 Task Legend
 
-```
+```text
 - [ ] [TaskID] [P?] [Story?] Description
        Depends on: [Task1] [Task2]
        Files: src/path/file.py, tests/path/test_file.py
@@ -216,7 +216,7 @@ This document defines all implementation tasks for Feature 001 in dependency ord
 
 ## 🔄 Dependency Graph
 
-```
+```text
 Legend: → means "depends on"
 
 [T-001] → [T-002]
@@ -270,6 +270,7 @@ Legend: → means "depends on"
 **MVP Includes**: Stories 1-3 (all P1 tasks)
 
 **MVP Success Criteria**:
+
 1. ✅ Ingest 100+ traces from OpenThoughts-114k in < 5 min (SC-001)
 2. ✅ All traces stored in Neo4j with correct schema (SC-003)
 3. ✅ All steps stored with NEXT edges in sequence (SC-002)
@@ -296,7 +297,7 @@ Legend: → means "depends on"
 
 When implementing each task, follow this checklist:
 
-```
+```text
 Task: [TaskID] Description
 Status: [ ] Not Started [ ] In Progress [ ] Code Complete [ ] Tested [ ] Reviewed [ ] Committed
 

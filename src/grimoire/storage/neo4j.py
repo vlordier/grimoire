@@ -137,14 +137,9 @@ class Neo4jStorage:
                     domain: $domain,
                     problem: $problem,
                     tags: $tags,
-                    status: $status,
-                    trace_version: $trace_version,
                     n_steps: $n_steps,
-                    is_duplicate: $is_duplicate,
-                    duplicate_of: $duplicate_of,
                     created_at: datetime($created_at),
                     updated_at: datetime($updated_at),
-                    provenance_sources: $provenance_sources,
                     provenance_license: $provenance_license,
                     provenance_sensitivity: $provenance_sensitivity,
                     provenance_ingested_at: datetime($provenance_ingested_at),
@@ -160,19 +155,14 @@ class Neo4jStorage:
                     "domain": trace.domain.value,
                     "problem": trace.problem,
                     "tags": trace.tags,
-                    "status": trace.status,
-                    "trace_version": trace.trace_version,
                     "n_steps": trace.n_steps,
-                    "is_duplicate": trace.is_duplicate,
-                    "duplicate_of": trace.duplicate_of,
-                    "created_at": trace.created_at.isoformat(),
-                    "updated_at": trace.updated_at.isoformat(),
-                    "provenance_sources": [s.dict() for s in trace.provenance_sources],
-                    "provenance_license": trace.provenance_license.value,
-                    "provenance_sensitivity": trace.provenance_sensitivity.value,
-                    "provenance_ingested_at": trace.provenance_ingested_at.isoformat(),
-                    "provenance_pipeline_version": trace.provenance_pipeline_version,
-                    "provenance_schema_version": trace.provenance_schema_version,
+                    "created_at": trace.created_at.isoformat() if trace.created_at else None,
+                    "updated_at": trace.updated_at.isoformat() if trace.updated_at else None,
+                    "provenance_license": trace.provenance.license_info.license.value,
+                    "provenance_sensitivity": trace.provenance.sensitivity.value,
+                    "provenance_ingested_at": trace.provenance.ingested_at.isoformat() if trace.provenance.ingested_at else None,
+                    "provenance_pipeline_version": trace.provenance.pipeline_version,
+                    "provenance_schema_version": trace.provenance.schema_version,
                 }
                 
                 result = tx.run(query, params)
@@ -217,8 +207,6 @@ class Neo4jStorage:
                     index: $index,
                     actor: $actor,
                     role: $role,
-                    fsm_id: $fsm_id,
-                    fsm_state: $fsm_state,
                     created_at: datetime($created_at)
                 })
                 CREATE (t)-[:HAS_STEP]->(s)
@@ -230,10 +218,8 @@ class Neo4jStorage:
                     "trace_id": step.trace_id,
                     "index": step.index,
                     "actor": step.actor,
-                    "role": step.role.value,
-                    "fsm_id": step.fsm_id,
-                    "fsm_state": step.fsm_state.value if step.fsm_state else None,
-                    "created_at": step.created_at.isoformat(),
+                    "role": step.role.value if hasattr(step.role, 'value') else str(step.role),
+                    "created_at": step.created_at.isoformat() if step.created_at else None,
                 }
                 
                 result = tx.run(query, params)
@@ -264,7 +250,7 @@ class Neo4jStorage:
         try:
             def _insert(tx: Transaction):
                 # Create edge between steps or other nodes
-                rel_type = edge.edge_type.value  # e.g., "NEXT", "DEPENDS_ON"
+                rel_type = edge.type.value if hasattr(edge.type, 'value') else str(edge.type)
                 
                 query = f"""
                 MATCH (src {{step_id: $src_id}})
@@ -292,6 +278,45 @@ class Neo4jStorage:
         except Exception as e:
             logger.error(f"Failed to insert edge {edge.edge_id}: {e}")
             raise Neo4jStorageException(f"Edge insertion failed: {e}")
+    
+    def create_next_edges(self, trace_id: str, steps: List[Step]) -> int:
+        """Create NEXT edges between sequential Steps.
+        
+        Per FR-005: Create edges in index order with no gaps.
+        
+        Args:
+            trace_id: The trace_id owning the steps
+            steps: List of Step objects in sequence
+            
+        Returns:
+            Number of edges created
+        """
+        edges_created = 0
+        try:
+            # Sort by index to ensure sequence
+            sorted_steps = sorted(steps, key=lambda s: s.index)
+            
+            with self.driver.session(database=self.database) as session:
+                with session.begin_transaction() as tx:
+                    for i in range(len(sorted_steps) - 1):
+                        src_step = sorted_steps[i]
+                        dst_step = sorted_steps[i + 1]
+                        
+                        query = """
+                        MATCH (src:Step {step_id: $src_id})
+                        MATCH (dst:Step {step_id: $dst_id})
+                        CREATE (src)-[:NEXT {weight: 1.0}]->(dst)
+                        """
+                        
+                        tx.run(query, src_id=src_step.step_id, dst_id=dst_step.step_id)
+                        edges_created += 1
+            
+            logger.info(f"Created {edges_created} NEXT edges for trace {trace_id}")
+            return edges_created
+            
+        except Exception as e:
+            logger.error(f"Failed to create NEXT edges for trace {trace_id}: {e}")
+            raise Neo4jStorageException(f"NEXT edge creation failed: {e}")
     
     def get_trace(self, trace_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve a Trace by ID.
