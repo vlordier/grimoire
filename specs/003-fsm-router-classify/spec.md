@@ -4,6 +4,20 @@
 **Status**: Specification Phase  
 **Reference Implementation**: [docs/reference/fsm-router-impl.md](../../docs/reference/fsm-router-impl.md)
 
+---
+
+## 📚 Reference Documentation
+
+**Prerequisite**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/) — Data ingestion foundation
+
+**See Also:**
+- [Build Plan](../../docs/architecture/build-plan.md) — Phase 2 context (FSM routing)
+- [System Architecture](../../docs/architecture/system-architecture.md) — FSM routing in control plane
+- [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — 10 universal FSMs (Design, Decide, Diagnose, Execute, etc.)
+- [Problem Archetypes](../../docs/domain/problem-archetypes.md) — Problem types to classify
+- [Control Pattern Taxonomy](../../docs/domain/control-pattern-taxonomy.md) — Pattern primitives
+- **Related**: Feature 002 (Danger Router), Feature 004 (Transition Guards), Feature 005 (Pattern Extraction)
+
 ## User Stories
 
 ### Story 1 - Classify Problem Type: Debugging Task (P1)

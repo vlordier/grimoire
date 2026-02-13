@@ -7,6 +7,17 @@
 
 ---
 
+## 📚 Reference Documentation
+
+**Prerequisites**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/plan.md), [Feature 003: FSM Router](../003-fsm-router-classify/plan.md)
+
+**See Also:**
+- [Build Plan](../../docs/architecture/build-plan.md) — Phase 3 context
+- [Pattern Detection & Pipeline](../../docs/reference/pattern-detection-and-pipeline.md) — Algorithms
+- [Control Pattern Taxonomy](../../docs/domain/control-pattern-taxonomy.md) — Pattern primitives
+
+---
+
 ## Phase 0: Design
 
 ### Key Questions

@@ -1,4 +1,18 @@
-# Feature 007-Optimization-Loop: Feedback-Driven Pattern Improvement
+# Feature 008-Optimization-Loop: Feedback-Driven Pattern Improvement
+
+---
+
+## 📚 Reference Documentation
+
+**Prerequisites**: All features 001-006 — Accumulates and improves patterns
+
+**See Also:**
+- [Build Plan](../../docs/architecture/build-plan.md) — Phase 3+ context (optimization loop)
+- [System Architecture](../../docs/architecture/system-architecture.md) — Full system feedback cycle
+- [Integration Test Strategy](../../docs/operations/INTEGRATION_TEST_STRATEGY.md) — Testing patterns across all features
+- [Control Flow Specification](../../docs/operations/CONTROL_FLOW_SPECIFICATION.md) — Loop enforcement + convergence
+- [Multi-Tenancy Specification](../../docs/operations/MULTI_TENANCY_SPECIFICATION.md) — Tenant-scoped pattern improvement
+- **Cross-cutting**: Features 001-007 contribute feedback to this loop
 
 ## Feature Overview
 

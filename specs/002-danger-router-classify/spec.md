@@ -6,6 +6,21 @@
 **Input**: Classify 4 danger archetypes (ambiguity, adversarial, irreversibility, institutional) and enforce safety gates during FSM transitions
 **Reference Implementation**: [Danger Classification Impl](../../docs/reference/danger-classification-impl.md)
 
+---
+
+## 📚 Reference Documentation
+
+**Prerequisite**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/) — Data ingestion foundation
+
+**See Also:**
+- [Build Plan](../../docs/architecture/build-plan.md) — Phase 2 context (danger routing + guards)
+- [System Architecture](../../docs/architecture/system-architecture.md) — Danger routing in control plane
+- [Danger Classification](../../docs/domain/danger-classification.md) — 4 archetypes (ambiguity, adversarial, irreversibility, institutional)
+- [Danger Classification Impl](../../docs/reference/danger-classification-impl.md) — Regex + probe classifier algorithm
+- [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — FSM routing context (002 complements 003)
+- [Problem Archetypes](../../docs/domain/problem-archetypes.md) — Problem types to classify
+- **Reinforces**: Feature 003 (FSM Router), Feature 004 (Transition Guards)
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Classify Ambiguity in Problem Statements (Priority: P1) 🎯 MVP

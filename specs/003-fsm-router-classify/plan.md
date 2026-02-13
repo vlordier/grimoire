@@ -7,6 +7,16 @@
 
 ---
 
+## 📚 Reference Documentation
+
+**Prerequisite**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/plan.md) — Data ingestion foundation
+
+**See Also:**
+- [Build Plan](../../docs/architecture/build-plan.md) — Phase 2 roadmap
+- [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — 10 universal FSMs
+- [Problem Archetypes](../../docs/domain/problem-archetypes.md) — Problem classification
+- **Related**: Feature 002 (Danger Router), Feature 004 (Transition Guards), Feature 005 (Pattern Extraction)
+
 ## Overview
 
 The FSM Router selects 1 of 10 universal FSM types based on problem intent and context. It enables the system to adapt its reasoning strategy to the problem structure (is this a debugging task? A design problem? An optimization? etc.).

@@ -8,6 +8,17 @@
 
 ---
 
+## 📚 Reference Documentation
+
+**Prerequisites**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/plan.md), [Feature 003: FSM Router](../003-fsm-router-classify/plan.md)
+
+**See Also:**
+- [Build Plan](../../docs/architecture/build-plan.md) — Phase 2 roadmap
+- [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — FSM transition rules
+- [Danger Classification](../../docs/domain/danger-classification.md) — Danger signals
+
+---
+
 ## Overview
 
 Transition Guards enforce 4 safety rules on FSM state transitions using danger scores from Phase 2.1 + optional FSM context from Phase 2.2:

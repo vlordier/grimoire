@@ -5,6 +5,22 @@
 **Status**: Draft  
 **Input**: Implementation Plan Phase 1 + Constitution Principles VI, VII, VIII
 
+---
+
+## 📚 Reference Documentation
+
+**See Also:**
+- [System Architecture](../../docs/architecture/system-architecture.md) — Full system context; 001 is Phase 1 foundation in data plane
+- [Build Plan](../../docs/architecture/build-plan.md) — Phased roadmap; 001 implements Phase 1 (data ingestion + dual-store)
+- [Capability Requirements](../../docs/architecture/capability-requirements.md) — Capabilities enabled by 001 (scope + dependencies)
+- [Canonical Schemas](../../docs/reference/canonical-schemas.md) — Authoritative Pydantic v2 contract (Trace, Step, Edge, etc.)
+- [Storage Mapping](../../docs/reference/storage-mapping.md) — Neo4j property graph + Qdrant payload 1:1 mapping
+- [Qdrant Setup](../../docs/reference/qdrant-setup.md) — Collection schemas and payload indexes
+- [Problem Archetypes](../../docs/domain/problem-archetypes.md) — Problem types that traces will encode (context for parser design)
+- [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — FSMs that traces reference via fsm_id (validation requirement)
+- [Integration Test Strategy](../../docs/operations/INTEGRATION_TEST_STRATEGY.md) — Test methodology for all features
+- **Deferred to Phase 2+:** [MULTI_TENANCY_SPECIFICATION.md](../../docs/operations/MULTI_TENANCY_SPECIFICATION.md), [API_VERSIONING_SPECIFICATION.md](../../docs/operations/API_VERSIONING_SPECIFICATION.md) (relevant for Phase 2 API & multi-tenant rollout)
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Ingest HuggingFace Dataset (Priority: P1) 🎯 MVP

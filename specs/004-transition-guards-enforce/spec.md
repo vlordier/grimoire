@@ -1,7 +1,21 @@
 # Feature Spec: Transition Guards (004)
 
 **Feature Branch**: `004-transition-guards-enforce`  
-**Status**: Specification Phase  
+**Status**: Specification Phase
+
+---
+
+## 📚 Reference Documentation
+
+**Prerequisites**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/), [Feature 003: FSM Router](../003-fsm-router-classify/) — Reads FSM state + enforces transitions
+
+**See Also:**
+- [Build Plan](../../docs/architecture/build-plan.md) — Phase 2 context (guards enforcement)
+- [System Architecture](../../docs/architecture/system-architecture.md) — Guards in control plane
+- [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — FSM transition rules + guards
+- [Danger Classification](../../docs/domain/danger-classification.md) — Danger signals influencing guard decisions
+- [Problem Archetypes](../../docs/domain/problem-archetypes.md) — Problem context for guard logic
+- **Related**: Feature 002 (Danger Router), Feature 003 (FSM Router)  
 **Reference Implementation**: [docs/reference/danger-classification-impl.md](../../docs/reference/danger-classification-impl.md)
 
 ---

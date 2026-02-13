@@ -3,6 +3,24 @@
 **Branch**: `001-canonical-schema-implementation` | **Date**: 2026-02-12 | **Spec**: [spec.md](spec.md)  
 **Constitution Version**: 1.1.0 | **Status**: Phase 0 Research + Phase 1 Design (Complete)
 
+---
+
+## 📚 Reference Documentation
+
+**See Also:**
+- [System Architecture](../../docs/architecture/system-architecture.md) — Full system context; 001 is Phase 1 foundation
+- [Build Plan](../../docs/architecture/build-plan.md) — Phased roadmap; 001 implements Phase 1 deliverables
+- [Capability Requirements](../../docs/architecture/capability-requirements.md) — Capabilities: CR-001 to CR-030 (this feature enables CR-001–CR-010)
+- [Canonical Schemas](../../docs/reference/canonical-schemas.md) — Master source for all Pydantic v2 models
+- [Storage Mapping](../../docs/reference/storage-mapping.md) — Neo4j + Qdrant mapping (implements this doc)
+- [Qdrant Setup](../../docs/reference/qdrant-setup.md) — Exact Qdrant collection/payload schema
+- [Problem Archetypes](../../docs/domain/problem-archetypes.md) — Problem types traces encode (parser input validation)
+- [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — FSM definitions (trace fsm_id must match catalog)
+- [Domain: Problem Archetypes](../../docs/domain/problem-archetypes.md) → Shapes traces will have
+- [Domain: Control Pattern Taxonomy](../../docs/domain/control-pattern-taxonomy.md) → Pattern vocabulary (Phase 2 usage)
+- [Integration Test Strategy](../../docs/operations/INTEGRATION_TEST_STRATEGY.md) — Test framework for all 001-008 features
+- **Phase 2 context:** [MULTI_TENANCY_SPECIFICATION.md](../../docs/operations/MULTI_TENANCY_SPECIFICATION.md), [API_VERSIONING_SPECIFICATION.md](../../docs/operations/API_VERSIONING_SPECIFICATION.md), [CONTROL_FLOW_SPECIFICATION.md](../../docs/operations/CONTROL_FLOW_SPECIFICATION.md)
+
 ## Summary
 
 Build foundational data ingestion pipeline that normalizes reasoning traces from HuggingFace datasets (114K and 1.2M scale) into canonical Pydantic schema, stores graph structure in Neo4j, persists embeddings in Qdrant with version tracking and multi-contributor text support. Establishes dual-store architecture (Principle VII) with versioned markdown text storage for future wiki-style collaboration. Achieves ≥200 traces/minute ingestion throughput on single instance with 100% provenance coverage and deduplication support.

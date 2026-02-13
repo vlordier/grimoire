@@ -7,6 +7,21 @@
 
 ---
 
+## 📚 Reference Documentation
+
+**Prerequisites**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/), [Feature 003: FSM Router](../003-fsm-router-classify/) — Reads ingested traces + FSM context
+
+**See Also:**
+- [Build Plan](../../docs/architecture/build-plan.md) — Phase 3 context (pattern discovery)
+- [System Architecture](../../docs/architecture/system-architecture.md) — Pattern extraction in learn plane
+- [Pattern Detection & Pipeline](../../docs/reference/pattern-detection-and-pipeline.md) — Algorithm, motif mining, corpus aggregation
+- [Control Pattern Taxonomy](../../docs/domain/control-pattern-taxonomy.md) — Pattern primitives + algebra
+- [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — FSM context for patterns
+- [Control Flow Specification](../../docs/operations/CONTROL_FLOW_SPECIFICATION.md) — Control flow patterns (Parts 5-8)
+- **Feeds into**: Feature 006 (Pattern Ranking)
+
+---
+
 ## Overview
 
 Pattern Extraction discovers recurring solution patterns from historical reasoning traces. It identifies: which steps work well together, what problems they solve, how frequently they succeed.

@@ -7,6 +7,17 @@
 
 ---
 
+## 📚 Reference Documentation
+
+**Prerequisite**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/plan.md) — Data ingestion foundation
+
+**See Also:**
+- [Build Plan](../../docs/architecture/build-plan.md) — Phase 2 roadmap
+- [Danger Classification](../../docs/domain/danger-classification.md) — Archetypes + scoring
+- [Danger Classification Impl](../../docs/reference/danger-classification-impl.md) — Algorithm details
+- [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — FSM routing context
+- **Related**: Feature 003 (FSM Router), Feature 004 (Transition Guards)
+
 ## Phase 0: Research & Clarification
 
 ### Key Decisions

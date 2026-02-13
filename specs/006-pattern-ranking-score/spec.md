@@ -1,5 +1,17 @@
 # Feature 006-Pattern-Ranking: Score Extracted Patterns
 
+---
+
+## 📚 Reference Documentation
+
+**Prerequisites**: [Feature 005: Pattern Extraction](../005-pattern-extraction-discover/) — Requires extracted patterns
+
+**See Also:**
+- [Build Plan](../../docs/architecture/build-plan.md) — Phase 3 context (ranking + optimization)
+- [System Architecture](../../docs/architecture/system-architecture.md) — Ranking in learn plane
+- [Pattern Detection & Pipeline](../../docs/reference/pattern-detection-and-pipeline.md) — Scoring algorithms + similarity
+- **Feeds into**: Feature 008 (Optimization Loop)
+
 ## Feature Overview
 
 Score and rank extracted reasoning patterns by effectiveness, safety, and relevance to enable intelligent pattern recommendations and feedback-driven optimization.
