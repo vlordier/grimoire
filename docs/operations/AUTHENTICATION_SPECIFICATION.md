@@ -22,7 +22,7 @@ This document defines the unified authentication and authorization strategy for 
 
 ## Authentication Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         AUTHENTICATION FLOW                              │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -72,7 +72,7 @@ from pydantic import BaseModel
 
 class APIKey(BaseModel):
     """API key model."""
-    
+
     key_id: str                    # "pk_live_xxx"
     key_hash: str                  # bcrypt hash of full key
     name: str                      # "ingestion-service"
@@ -85,26 +85,26 @@ class APIKey(BaseModel):
 
 class APIKeyAuth:
     """API key authentication handler."""
-    
+
     HEADER_NAME = "X-API-Key"
     PREFIX = "grimoire_"
-    
+
     def __init__(self, redis_client: redis.Redis):
         self.redis = redis_client
         self._cache = {}  # In-memory cache
-    
+
     def generate_key(self, name: str, scopes: List[str], 
                      owner: str, ttl_days: int = 365) -> tuple[str, APIKey]:
         """Generate new API key. Returns (full_key, key_record)."""
-        
+
         # Generate cryptographically secure key
         key_id = f"pk_{secrets.token_urlsafe(16)}"
         secret = secrets.token_urlsafe(32)
         full_key = f"{self.PREFIX}{key_id}_{secret}"
-        
+
         # Hash for storage
         key_hash = hashlib.sha256(full_key.encode()).hexdigest()
-        
+
         # Create record
         api_key = APIKey(
             key_id=key_id,
@@ -116,29 +116,29 @@ class APIKeyAuth:
             is_active=True,
             owner=owner
         )
-        
+
         # Store in Redis
         self.redis.hset(f"apikey:{key_id}", mapping=api_key.dict())
-        
+
         return full_key, api_key
-    
+
     async def validate_key(self, request: Request) -> Optional[APIKey]:
         """Validate API key from request header."""
-        
+
         header_key = request.headers.get(self.HEADER_NAME)
         if not header_key:
             return None
-        
+
         # Check format
         if not header_key.startswith(self.PREFIX):
             return None
-        
+
         # Extract key_id
         try:
             key_id = header_key.split("_")[1]
         except IndexError:
             return None
-        
+
         # Check cache
         if key_id in self._cache:
             api_key = self._cache[key_id]
@@ -149,24 +149,24 @@ class APIKeyAuth:
                 return None
             api_key = APIKey(**{k.decode(): v.decode() for k, v in data.items()})
             self._cache[key_id] = api_key
-        
+
         # Validate
         if not api_key.is_active:
             return None
-        
+
         if api_key.expires_at and api_key.expires_at < datetime.utcnow():
             return None
-        
+
         # Verify hash
         key_hash = hashlib.sha256(header_key.encode()).hexdigest()
         if not secrets.compare_digest(key_hash, api_key.key_hash):
             return None
-        
+
         # Update last used (async, don't block)
         asyncio.create_task(self._update_last_used(key_id))
-        
+
         return api_key
-    
+
     async def _update_last_used(self, key_id: str):
         """Update last used timestamp."""
         self.redis.hset(f"apikey:{key_id}", "last_used_at", 
@@ -194,18 +194,18 @@ from typing import Optional
 
 class JWTAuth:
     """JWT authentication handler."""
-    
+
     ALGORITHM = "RS256"
     ACCESS_TOKEN_EXPIRE = timedelta(minutes=15)
     REFRESH_TOKEN_EXPIRE = timedelta(days=7)
-    
+
     def __init__(self, private_key: str, public_key: str):
         self.private_key = private_key
         self.public_key = public_key
-    
+
     def create_access_token(self, user_id: str, scopes: List[str]) -> str:
         """Create JWT access token."""
-        
+
         payload = {
             "sub": user_id,                    # Subject (user ID)
             "iss": "grimoire",                  # Issuer
@@ -215,12 +215,12 @@ class JWTAuth:
             "scope": " ".join(scopes),          # Scopes
             "type": "access"
         }
-        
+
         return jwt.encode(payload, self.private_key, algorithm=self.ALGORITHM)
-    
+
     def validate_token(self, token: str) -> Optional[dict]:
         """Validate and decode JWT."""
-        
+
         try:
             payload = jwt.decode(
                 token,
@@ -246,19 +246,19 @@ class JWTAuth:
 
 server {
     listen 443 ssl;
-    
+
     ssl_certificate /etc/ssl/certs/server.crt;
     ssl_certificate_key /etc/ssl/private/server.key;
     ssl_client_certificate /etc/ssl/certs/ca.crt;
     ssl_verify_client on;  # Require client certificate
-    
+
     location / {
         # Client cert info passed to backend
         proxy_set_header X-SSL-Client-S-DN $ssl_client_s_dn;
         proxy_set_header X-SSL-Client-I-DN $ssl_client_i_dn;
         proxy_set_header X-SSL-Client-Serial $ssl_client_serial;
         proxy_set_header X-SSL-Client-Verify $ssl_client_verify;
-        
+
         proxy_pass http://backend;
     }
 }
@@ -278,7 +278,7 @@ from typing import List, Set
 
 class Role(str, Enum):
     """User roles."""
-    
+
     ADMIN = "admin"                    # Full access
     DATA_ENGINEER = "data_engineer"    # Ingestion, querying
     SAFETY_ENGINEER = "safety_engineer" # Danger classification, guards
@@ -290,21 +290,21 @@ class Role(str, Enum):
 # Permission matrix
 PERMISSIONS = {
     Role.ADMIN: {"*"},  # All permissions
-    
+
     Role.DATA_ENGINEER: {
         "ingest:read", "ingest:write",
         "retrieve:read",
         "storage:read", "storage:write",
         "trace:read", "trace:write"
     },
-    
+
     Role.SAFETY_ENGINEER: {
         "classify:read", "classify:write",
         "guard:read", "guard:write",
         "danger:read", "danger:write",
         "trace:read"
     },
-    
+
     Role.RESEARCHER: {
         "pattern:read", "pattern:write",
         "rank:read", "rank:write",
@@ -312,14 +312,14 @@ PERMISSIONS = {
         "experiment:read", "experiment:write",
         "trace:read"
     },
-    
+
     Role.OPERATOR: {
         "monitoring:read",
         "drift:read",
         "guard:read",
         "experiment:read"
     },
-    
+
     Role.SERVICE: {
         "ingest:write",
         "classify:write",
@@ -329,7 +329,7 @@ PERMISSIONS = {
         "feedback:write",
         "internal:*"
     },
-    
+
     Role.READONLY: {
         "trace:read",
         "pattern:read",
@@ -351,13 +351,13 @@ def require_permission(permission: str):
             # Get current user from request context
             request = kwargs.get('request')
             user = request.state.user
-            
+
             if not has_permission(user.role, permission):
                 raise HTTPException(
                     status_code=403,
                     detail=f"Permission denied: {permission}"
                 )
-            
+
             return await func(*args, **kwargs)
         return wrapper
     return decorator
@@ -392,9 +392,9 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> User:
     """Dependency to get current authenticated user."""
-    
+
     token = credentials.credentials
-    
+
     # Try JWT first
     jwt_payload = jwt_auth.validate_token(token)
     if jwt_payload:
@@ -403,7 +403,7 @@ async def get_current_user(
             role=Role(jwt_payload.get("role", "readonly")),
             scopes=jwt_payload.get("scope", "").split()
         )
-    
+
     # Try API key
     api_key = await api_key_auth.validate_key(request)
     if api_key:
@@ -412,7 +412,7 @@ async def get_current_user(
             role=Role.SERVICE,
             scopes=api_key.scopes
         )
-    
+
     raise HTTPException(status_code=401, detail="Invalid authentication")
 
 async def require_scope(scope: str):
@@ -456,11 +456,11 @@ authentication:
   methods:
     - API Key (service)
     - JWT (user dashboard)
-  
+
   scopes:
     ingest:write: Submit traces for ingestion
     ingest:read: View ingestion status
-    
+
   rate_limits:
     api_key: 1000/min
     jwt: 100/min
@@ -472,7 +472,7 @@ authentication:
 authentication:
   methods:
     - API Key (service-to-service)
-    
+
   scopes:
     classify:read: Read danger scores
     classify:write: Submit for classification
@@ -480,7 +480,7 @@ authentication:
     route:write: Submit for routing
     guard:read: Read guard decisions
     guard:write: Submit for guard check
-    
+
   rate_limits:
     classify: 2000/min
     route: 2000/min
@@ -494,7 +494,7 @@ authentication:
   methods:
     - API Key (service)
     - JWT (researchers)
-    
+
   scopes:
     pattern:read: View patterns
     pattern:write: Create/modify patterns
@@ -503,7 +503,7 @@ authentication:
     feedback:write: Submit feedback
     experiment:read: View A/B tests
     experiment:write: Create experiments
-    
+
   rate_limits:
     pattern: 500/min
     rank: 1000/min
@@ -519,7 +519,7 @@ authentication:
 
 class AuditLogger:
     """Security audit logging."""
-    
+
     def log_auth_event(
         self,
         event_type: str,           # "login", "access_denied", "api_key_created"
@@ -530,7 +530,7 @@ class AuditLogger:
         metadata: dict = None
     ):
         """Log authentication/authorization event."""
-        
+
         audit_entry = {
             "timestamp": datetime.utcnow().isoformat(),
             "event_type": event_type,
@@ -543,14 +543,14 @@ class AuditLogger:
             "request_id": metadata.get("request_id"),
             "reason": metadata.get("reason") if not success else None
         }
-        
+
         # Write to append-only audit log
         self._write_to_audit_log(audit_entry)
-        
+
         # Alert on suspicious activity
         if not success and event_type in ["login", "access_denied"]:
             self._alert_security_team(audit_entry)
-    
+
     def _write_to_audit_log(self, entry: dict):
         """Write to immutable audit store (separate DB/table)."""
         # Neo4j: Create AuditEvent node
@@ -574,10 +574,10 @@ async def classify(
             metadata={"reason": "insufficient_permissions"}
         )
         raise HTTPException(status_code=403)
-    
+
     # Process request
     result = await classifier.classify(request)
-    
+
     # Log success
     audit_logger.log_auth_event(
         event_type="api_access",
@@ -586,7 +586,7 @@ async def classify(
         action="POST",
         success=True
     )
-    
+
     return result
 ```
 
@@ -602,24 +602,24 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers to all responses."""
-    
+
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        
+
         # Prevent XSS
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
-        
+
         # CSP
         response.headers["Content-Security-Policy"] = "default-src 'self'"
-        
+
         # HSTS (HTTPS only)
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        
+
         # Remove server info
         response.headers.pop("Server", None)
-        
+
         return response
 ```
 
@@ -628,18 +628,21 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 ## Implementation Roadmap
 
 ### Phase 1: MVP (Week 1)
+
 - [ ] API key generation/validation
 - [ ] Basic RBAC (admin, service, readonly)
 - [ ] Security headers middleware
 - [ ] Audit logging
 
 ### Phase 2: Enhanced (Week 2-3)
+
 - [ ] JWT support for user auth
 - [ ] Fine-grained permissions
 - [ ] Rate limiting by key/user
 - [ ] API key rotation
 
 ### Phase 3: Production (Week 4)
+
 - [ ] mTLS for service mesh
 - [ ] OAuth2 integration
 - [ ] Security monitoring dashboard

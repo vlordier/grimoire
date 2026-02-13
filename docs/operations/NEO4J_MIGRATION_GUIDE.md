@@ -12,6 +12,7 @@
 This document defines the strategy for evolving the Neo4j graph schema as Grimoire features progress through development phases. Schema changes are inevitable as new features (002-008) add new node types, relationships, and properties.
 
 **Migration Principles** (from Constitution):
+
 - Schema versioning MUST be tracked
 - Migrations MUST be explicit and reversible
 - Backward compatibility MUST be maintained during transitions
@@ -73,6 +74,7 @@ CREATE (mh:MigrationHistory {
 ```
 
 **Constraints**:
+
 ```cypher
 CREATE CONSTRAINT trace_id_unique IF NOT EXISTS
 FOR (t:Trace) REQUIRE t.trace_id IS UNIQUE;
@@ -115,6 +117,7 @@ SET sv.version = "1.1.0",
 ```
 
 **Rollback**: v1.1.0_rollback.cypher
+
 ```cypher
 // Remove danger score properties (data loss warning!)
 MATCH (s:Step)
@@ -357,32 +360,32 @@ def get_current_version(driver) -> str:
 
 def run_migration(driver, version: str, script_path: str):
     print(f"Running migration {version}...")
-    
+
     with open(script_path) as f:
         cypher = f.read()
-    
+
     with driver.session() as session:
         # Run in transaction
         session.run(cypher)
-    
+
     print(f"✅ Migration {version} complete")
 
 def migrate(target_version: str = None):
     driver = neo4j.GraphDatabase.driver("bolt://localhost:7687")
-    
+
     current = get_current_version(driver)
     print(f"Current schema version: {current}")
-    
+
     # Find migrations to run
     versions = sorted(MIGRATIONS.keys())
     current_idx = versions.index(current)
     target_idx = versions.index(target_version) if target_version else len(versions) - 1
-    
+
     for version in versions[current_idx + 1:target_idx + 1]:
         script_path = MIGRATIONS[version]
         if script_path:
             run_migration(driver, version, script_path)
-    
+
     driver.close()
 
 if __name__ == "__main__":
@@ -485,6 +488,7 @@ SET sv.version = "1.0.0",
 ## Environment-Specific Migrations
 
 ### Development
+
 ```bash
 # Auto-migrate on startup
 export NEO4J_AUTO_MIGRATE=true
@@ -492,12 +496,14 @@ export NEO4J_TARGET_VERSION=latest
 ```
 
 ### Staging
+
 ```bash
 # Manual migration with verification
 python scripts/migrate.py --target 2.1.0 --verify
 ```
 
 ### Production
+
 ```bash
 # Blue-green deployment
 # 1. Migrate standby database
