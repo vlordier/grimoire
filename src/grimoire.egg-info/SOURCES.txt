@@ -1,0 +1,8 @@
+pyproject.toml
+src/grimoire/__init__.py
+src/grimoire/logging_setup.py
+src/grimoire.egg-info/PKG-INFO
+src/grimoire.egg-info/SOURCES.txt
+src/grimoire.egg-info/dependency_links.txt
+src/grimoire.egg-info/requires.txt
+src/grimoire.egg-info/top_level.txt

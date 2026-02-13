@@ -1,0 +1,48 @@
+"""Requirements/dependencies for Grimoire implementation.
+
+Updated versions for Phase 1 ingestion and storage implementation.
+
+Core Stack (per Constitution):
+- Python 3.11+
+- Pydantic >= 2 (canonical schema)
+- Neo4j 5.x graph database
+- Qdrant >= 1.7 vector database
+"""
+
+# Data & Schema
+pydantic>=2.0,<3.0          # Canonical schema validation
+python-ulid>=1.1            # Composite ID generation
+
+# Ingestion
+datasets>=2.14.0            # HuggingFace dataset loading
+huggingface-hub>=0.17.0     # HuggingFace integration
+
+# Storage: Neo4j
+neo4j>=5.0,<6.0             # Neo4j graph database driver
+
+# Storage: Qdrant
+qdrant-client>=2.7.0        # Vector database client
+
+# Embeddings
+sentence-transformers>=2.2.2 # Text embedding models
+torch>=2.0.0                # PyTorch (dependency of sentence-transformers)
+numpy>=1.24.0               # Numerical computing
+
+# Cloud Storage
+boto3>=1.28.0               # AWS S3 support
+google-cloud-storage>=2.10.0 # GCS support
+
+# Development & Testing
+pytest>=7.4.0               # Test framework
+pytest-cov>=4.1.0           # Coverage reporting
+pytest-asyncio>=0.21.0      # Async test support
+
+# Linting & Type Checking (per Constitution Principle V)
+ruff>=0.1.0                 # Fast Python linter
+mypy>=1.5.0                 # Static type checker
+black>=23.0.0               # Code formatter
+
+# Utilities
+python-dotenv>=1.0.0        # Environment variable loading
+loguru>=0.7.0               # Enhanced logging
+click>=8.1.0                # CLI interface
