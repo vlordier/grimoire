@@ -12,6 +12,7 @@
 **Prerequisite**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/plan.md) — Data ingestion foundation
 
 **See Also:**
+
 - [Build Plan](../../docs/architecture/build-plan.md) — Phase 2 roadmap
 - [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — 10 universal FSMs
 - [Problem Archetypes](../../docs/domain/problem-archetypes.md) — Problem classification

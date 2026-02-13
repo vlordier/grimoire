@@ -7,6 +7,7 @@
 **Prerequisites**: [Feature 005: Pattern Extraction](../005-pattern-extraction-discover/) — Requires extracted patterns
 
 **See Also:**
+
 - [Build Plan](../../docs/architecture/build-plan.md) — Phase 3 context (ranking + optimization)
 - [System Architecture](../../docs/architecture/system-architecture.md) — Ranking in learn plane
 - [Pattern Detection & Pipeline](../../docs/reference/pattern-detection-and-pipeline.md) — Scoring algorithms + similarity

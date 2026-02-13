@@ -7,6 +7,7 @@
 **Prerequisites**: All features 001-006 — Accumulates and improves patterns
 
 **See Also:**
+
 - [Build Plan](../../docs/architecture/build-plan.md) — Phase 3+ context (optimization loop)
 - [System Architecture](../../docs/architecture/system-architecture.md) — Full system feedback cycle
 - [Integration Test Strategy](../../docs/operations/INTEGRATION_TEST_STRATEGY.md) — Testing patterns across all features
@@ -19,6 +20,16 @@
 ## Feature Overview
 
 Build a feedback loop system that tracks pattern effectiveness, detects concept drift, and triggers pattern re-ranking and optimization for continuous system improvement.
+
+## Clarifications
+
+### Session 2026-02-13
+
+- Q: Where should feedback events be stored? → A: Neo4j nodes + relationships
+- Q: How should A/B routing be keyed? → A: trace_id (sticky per trace)
+- Q: How often should drift detection run? → A: weekly batch
+- Q: What happens when A/B tests are inconclusive? → A: keep version_a; continue collecting until significance or timeout
+- Q: How long should feedback be retained? → A: 90 days for active patterns; archive or drop after deprecation
 
 ## User Stories
 
@@ -100,12 +111,15 @@ Build a feedback loop system that tracks pattern effectiveness, detects concept 
    - Deduplication (trace_id + pattern_id)
    - 90-day retention policy
    - Batch processing every T=10 seconds
+   - Persist each feedback event as a Neo4j `FeedbackEvent` node linked to `Pattern` and `Trace`
+   - After a pattern is deprecated, archive or drop its feedback after 90 days
 
 2. **Concept Drift Metrics**
    - Rolling averages: 30-day + 30-60 day windows
    - Drift threshold: 15% decline in success_rate OR quality
    - Persist drift alerts to knowledge graph
    - Dashboard: show drifting patterns
+   - Drift detection run frequency: weekly batch
 
 3. **Re-Ranking Engine**
    - Batch trigger: every K=50 feedback events
@@ -116,10 +130,11 @@ Build a feedback loop system that tracks pattern effectiveness, detects concept 
 
 4. **A/B Testing**
    - Create experiments with traffic split (50/50 default)
-   - Route based on experiment_id hash (deterministic)
+   - Route based on experiment_id + trace_id hash (deterministic; sticky per trace)
    - Collect separate feedback streams per variant
    - Statistical testing: t-test, KL divergence
    - Auto-promotion when p < 0.05
+   - If inconclusive, keep version_a and continue until significance or timeout
 
 5. **Pattern Lifecycle**
    - Version management: pattern → [v1, v2, v3...]

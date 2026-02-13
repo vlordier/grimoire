@@ -10,6 +10,7 @@
 ## 📚 Reference Documentation
 
 **See Also:**
+
 - [System Architecture](../../docs/architecture/system-architecture.md) — Full system context; 001 is Phase 1 foundation in data plane
 - [Build Plan](../../docs/architecture/build-plan.md) — Phased roadmap; 001 implements Phase 1 (data ingestion + dual-store)
 - [Capability Requirements](../../docs/architecture/capability-requirements.md) — Capabilities enabled by 001 (scope + dependencies)

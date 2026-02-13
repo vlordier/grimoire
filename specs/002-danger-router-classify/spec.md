@@ -13,6 +13,7 @@
 **Prerequisite**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/) — Data ingestion foundation
 
 **See Also:**
+
 - [Build Plan](../../docs/architecture/build-plan.md) — Phase 2 context (danger routing + guards)
 - [System Architecture](../../docs/architecture/system-architecture.md) — Danger routing in control plane
 - [Danger Classification](../../docs/domain/danger-classification.md) — 4 archetypes (ambiguity, adversarial, irreversibility, institutional)

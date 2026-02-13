@@ -11,6 +11,7 @@
 **Prerequisite**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/) — Data ingestion foundation
 
 **See Also:**
+
 - [Build Plan](../../docs/architecture/build-plan.md) — Phase 2 context (FSM routing)
 - [System Architecture](../../docs/architecture/system-architecture.md) — FSM routing in control plane
 - [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — 10 universal FSMs (Design, Decide, Diagnose, Execute, etc.)

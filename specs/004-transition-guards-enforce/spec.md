@@ -10,6 +10,7 @@
 **Prerequisites**: [Feature 001: Canonical Schema](../001-canonical-schema-implementation/), [Feature 003: FSM Router](../003-fsm-router-classify/) — Reads FSM state + enforces transitions
 
 **See Also:**
+
 - [Build Plan](../../docs/architecture/build-plan.md) — Phase 2 context (guards enforcement)
 - [System Architecture](../../docs/architecture/system-architecture.md) — Guards in control plane
 - [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — FSM transition rules + guards

@@ -32,7 +32,6 @@
     - Create benchmark suite (200-500 prompts) aligned with 15 problem archetypes
 -->
 
-
 # Grimoire Constitution
 
 ## Core Principles
@@ -368,27 +367,32 @@ All feature development follows the Speckit workflow:
 This constitution is grounded in the following authoritative specifications and domain knowledge documents. All feature teams MUST familiarize themselves with these before design work.
 
 ### Vision & Strategy
+
 - [System Specification](../../docs/vision/spec.md) — High-level system overview
 - [System Architecture](../../docs/architecture/system-architecture.md) — Component diagram and data flows
 - [Build Plan](../../docs/architecture/build-plan.md) — Phased implementation roadmap (Phase 0–6)
 - [Capability Requirements](../../docs/architecture/capability-requirements.md) — 9 capability areas, 95% checklist
 
 ### Domain Knowledge (Principle XI)
+
 - [Problem Archetypes](../../docs/domain/problem-archetypes.md) — 15 problem types + canonical steps
 - [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — 10 universal FSMs with state vocabulary
 - [Danger Classification](../../docs/domain/danger-classification.md) — 4 danger archetypes + scoring model
 - [Control Pattern Taxonomy](../../docs/domain/control-pattern-taxonomy.md) — 10 pattern groups → 6 primitives + algebra
 
 ### Data & Storage (Principles VI, VII)
+
 - [Canonical Schemas](../../docs/reference/canonical-schemas.md) — Pydantic v2 models (Trace, Step, Edge, Pattern, Artifact)
 - [Storage Mapping](../../docs/reference/storage-mapping.md) — Neo4j property graph + Qdrant payload mapping
 - [Qdrant Setup](../../docs/reference/qdrant-setup.md) — Collection schemas and payload indexes
 
 ### Implementation Reference
+
 - [Pattern Detection & Pipeline](../../docs/reference/pattern-detection-and-pipeline.md) — Pattern mining algorithms + corpus aggregation
 - [Danger Classification Impl](../../docs/reference/danger-classification-impl.md) — Regex + probe classifier with FSM guards
 
 ### Operational Specifications (Principle XII)
+
 - [Multi-Tenancy Specification](../../docs/operations/MULTI_TENANCY_SPECIFICATION.md) — Tenant isolation, rate limiting
 - [API Versioning Specification](../../docs/operations/API_VERSIONING_SPECIFICATION.md) — URL versioning, deprecation policy
 - [Authentication & Authorization](../../docs/operations/AUTHENTICATION_SPECIFICATION.md) — JWT/OAuth2, RBAC, audit trail
@@ -425,9 +429,10 @@ decisions.
 - `speckit.analyze` validates spec/plan alignment with this document.
 - Violations MUST be resolved before merge; no exceptions.
 
-**Version**: 1.2.0 | **Ratified**: 2026-02-11 | **Last Amended**: 2026-02-13 
+**Version**: 1.2.0 | **Ratified**: 2026-02-11 | **Last Amended**: 2026-02-13
 
 **Changelog (1.1.0 → 1.2.0)**:
+
 - Added Principle XI: Domain Knowledge Foundation
 - Added Principle XII: Operational Specifications
 - Expanded Technical Stack with explicit data model and storage references

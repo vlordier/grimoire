@@ -8,6 +8,7 @@
 ## 📚 Reference Documentation
 
 **See Also:**
+
 - [System Architecture](../../docs/architecture/system-architecture.md) — Full system context; 001 is Phase 1 foundation
 - [Build Plan](../../docs/architecture/build-plan.md) — Phased roadmap; 001 implements Phase 1 deliverables
 - [Capability Requirements](../../docs/architecture/capability-requirements.md) — Capabilities: CR-001 to CR-030 (this feature enables CR-001–CR-010)

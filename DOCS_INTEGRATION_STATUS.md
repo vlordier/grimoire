@@ -19,16 +19,19 @@ All feature specs (001-008) now comprehensively reference **docs/** directory. T
 ## Active Documentation (19 files, 82.6%)
 
 ### Vision & Strategy (2/3 active)
+
 ✅ [docs/vision/spec.md](docs/vision/spec.md) — Referenced 11x (high-level overview)  
 ✅ [docs/vision/prd.md](docs/vision/prd.md) — Via README.md (stakeholder summary)  
 ✅ [docs/vision/prd-executive.md](docs/vision/prd-executive.md) — Via README.md (executive summary)
 
 ### Architecture (3/3 active) ✅ 100%
+
 ✅ [docs/architecture/system-architecture.md](docs/architecture/system-architecture.md) — Referenced 8x (all features)  
 ✅ [docs/architecture/capability-requirements.md](docs/architecture/capability-requirements.md) — Referenced 2x  
 ✅ [docs/architecture/build-plan.md](docs/architecture/build-plan.md) — Referenced 14x (all features)
 
 ### Operations (7/10 active) - 70%
+
 ✅ [docs/operations/CONTROL_FLOW_SPECIFICATION.md](docs/operations/CONTROL_FLOW_SPECIFICATION.md) — Referenced 4x (005, 008)  
 ✅ [docs/operations/MULTI_TENANCY_SPECIFICATION.md](docs/operations/MULTI_TENANCY_SPECIFICATION.md) — Referenced 3x (008, deferred)  
 ✅ [docs/operations/API_VERSIONING_SPECIFICATION.md](docs/operations/API_VERSIONING_SPECIFICATION.md) — Referenced 2x (001, 008)  
@@ -39,12 +42,14 @@ All feature specs (001-008) now comprehensively reference **docs/** directory. T
 🆘 [docs/operations/NEO4J_MIGRATION_GUIDE.md](docs/operations/NEO4J_MIGRATION_GUIDE.md) — Not referenced (Phase 2+)
 
 ### Domain (4/4 active) ✅ 100%
+
 ✅ [docs/domain/danger-classification.md](docs/domain/danger-classification.md) — Referenced 7x (002, 003, 004)  
 ✅ [docs/domain/fsm-catalogue.md](docs/domain/fsm-catalogue.md) — Referenced 16x (003, 004, 005, etc.)  
 ✅ [docs/domain/control-pattern-taxonomy.md](docs/domain/control-pattern-taxonomy.md) — Referenced 4x (005, 006)  
 ✅ [docs/domain/problem-archetypes.md](docs/domain/problem-archetypes.md) — Referenced 7x (002, 003, 004)
 
 ### Reference (5/5 active) ✅ 100%
+
 ✅ [docs/reference/canonical-schemas.md](docs/reference/canonical-schemas.md) — Referenced 6x (all features)  
 ✅ [docs/reference/danger-classification-impl.md](docs/reference/danger-classification-impl.md) — Referenced 14x (002, 003)  
 ✅ [docs/reference/pattern-detection-and-pipeline.md](docs/reference/pattern-detection-and-pipeline.md) — Referenced 4x (005, 006)  
@@ -56,35 +61,42 @@ All feature specs (001-008) now comprehensively reference **docs/** directory. T
 ## Feature-to-Documentation Mapping
 
 ### Feature 001: Canonical Schema Implementation
+
 **Docs Referenced**: 14 files  
 ✅ Core references: canonical-schemas.md, storage-mapping.md, qdrant-setup.md  
 ✅ Domain context: problem-archetypes.md, fsm-catalogue.md  
 ✅ Operational: integration-test-strategy.md, authentication-specification.md, api-versioning-specification.md
 
 ### Feature 002: Danger Router
+
 **Docs Referenced**: 7 files  
 ✅ Core: danger-classification.md, danger-classification-impl.md  
 ✅ Context: fsm-catalogue.md, problem-archetypes.md
 
 ### Feature 003: FSM Router
+
 **Docs Referenced**: 8 files  
 ✅ Core: fsm-catalogue.md  
 ✅ Context: problem-archetypes.md, control-pattern-taxonomy.md, danger-classification.md
 
 ### Feature 004: Transition Guards
+
 **Docs Referenced**: 5 files  
 ✅ Core: fsm-catalogue.md, danger-classification.md
 
 ### Feature 005: Pattern Extraction
+
 **Docs Referenced**: 8 files  
 ✅ Core: pattern-detection-and-pipeline.md, control-pattern-taxonomy.md  
 ✅ Context: fsm-catalogue.md, control-flow-specification.md
 
 ### Feature 006: Pattern Ranking
+
 **Docs Referenced**: 4 files  
 ✅ Core: pattern-detection-and-pipeline.md
 
 ### Feature 008: Optimization Loop
+
 **Docs Referenced**: 11 files  
 ✅ Core: build-plan.md, integration-test-strategy.md, control-flow-specification.md  
 ✅ Cross-cutting: multi-tenancy-specification.md, data-export-import-specification.md, authentication-specification.md
