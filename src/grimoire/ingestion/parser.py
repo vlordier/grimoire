@@ -17,7 +17,7 @@ References:
 
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from ulid import ULID
 
@@ -32,7 +32,9 @@ from grimoire.core.schema.models import (
     Sensitivity,
     LicenseType,
     SourceType,
-   SourceRef,
+    SourceRef,
+    Provenance,
+    LicenseInfo,
 )
 
 
@@ -172,32 +174,44 @@ class HuggingFaceParser:
             )
            
             # Build Trace object
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
+            
+            # Create provenance object with license info
+            license_info = LicenseInfo(
+                license=LicenseType.APACHE_2,
+                attribution=f"OpenThoughts dataset: {self.config.dataset_name}",
+            )
+            
+            provenance = Provenance(
+                sources=[source_ref],
+                license_info=license_info,
+                sensitivity=self.config.sensitivity,
+                ingested_at=now,
+                pipeline_version=self.config.pipeline_version,
+                schema_version="v1",
+            )
+            
             trace = Trace(
                 trace_id=trace_id,
-                title=record.get("title") or problem[:100],  # Truncate title if needed
+                title=record.get("title") or problem[:100],
                 domain=domain,
                 tags=tags,
-                problem=problem[:5000] if len(problem) > 5000 else problem,  # Truncate per plan
+                problem=problem[:5000] if len(problem) > 5000 else problem,
                 created_at=now,
                 updated_at=now,
-                status="ingested",
-                trace_version=1,
                 n_steps=n_steps,
-                outcome=record.get("outcome"),
-                provenance_sources=[source_ref],
-                provenance_license=LicenseType.APACHE_2_0,  # OpenThoughts uses Apache 2.0
-                provenance_license_url="https://www.apache.org/licenses/LICENSE-2.0",
-                provenance_attribution=f"OpenThoughts dataset: {self.config.dataset_name}",
-                provenance_sensitivity=self.config.sensitivity,
-                provenance_ingested_at=now,
-                provenance_pipeline_version=self.config.pipeline_version,
-                provenance_schema_version="v1",
-                content_hash=content_hash,
-                is_duplicate=is_duplicate,
-                duplicate_of=duplicate_of,
+                outcome={
+                    **record.get("outcome", {}),
+                    "_dedup": {
+                        "is_duplicate": is_duplicate,
+                        "duplicate_of": duplicate_of,
+                        "content_hash": content_hash,
+                    }
+                },
+                provenance=provenance,
             )
-           
+            
+            return trace
             return trace
            
         except ValidationError as e:
