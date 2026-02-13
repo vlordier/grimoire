@@ -1,0 +1,18 @@
+# RuMDL configuration for Grimoire documentation
+
+[global]
+# Disable rules that conflict with our documentation style
+disable = [
+  "MD036",  # Emphasis used instead of heading (intentional for semantic markers)
+  "MD041",  # First line should be level 1 heading (agent files have YAML frontmatter)
+  "MD051",  # Link fragment not found (some optional anchors)
+  "MD052",  # Reference not found (optional references)
+  "MD057",  # Relative link does not exist (specs link to optional docs)
+  "MD033",  # Inline HTML found (VS Code pick lists use HTML)
+]
+
+[MD013]
+line_length = 800  # Allow very long lines for URLs and metadata
+
+[MD026]
+punctuation = "!.?"  # Allow heading punctuation

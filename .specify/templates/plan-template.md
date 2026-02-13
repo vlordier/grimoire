@@ -34,6 +34,7 @@
 Verify compliance with Grimoire Constitution (v1.1.0):
 
 **Core Principles**:
+
 - [ ] I. Recipe-First: Feature centers on recipes/patterns (not ad-hoc)
 - [ ] II. Verification Before Learning: All learning loops include verification (NON-NEGOTIABLE)
 - [ ] III. Federated Quality: Patterns pass quality gates before promotion
@@ -46,6 +47,7 @@ Verify compliance with Grimoire Constitution (v1.1.0):
 - [ ] X. Continuous Eval: Quality metrics and benchmarks defined
 
 **Technical Stack Compliance**:
+
 - [ ] Python 3.11+
 - [ ] Pydantic >= 2 for schemas
 - [ ] Neo4j for graph storage (or justified alternative)
