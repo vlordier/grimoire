@@ -1,12 +1,11 @@
 # RuMDL configuration for Grimoire documentation
 # Relaxed settings for long-form technical documentation
 
+[global]
+disable = ["MD036"]  # Allow emphasis-as-heading for semantic markers
+
 [MD013]
 line_length = 400  # Allow very long lines for URLs and metadata
 
 [MD026]
 punctuation = "!.?"
-
-[MD036]
-# Allow emphasis-as-heading - used for "Document History", "Transitions", etc.
-# These are semantic markers in structured technical documentation
