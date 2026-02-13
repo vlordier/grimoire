@@ -106,6 +106,7 @@ qdrant_client.upsert(
 ## Enums & Constants
 
 ### DangerType (from canonical)
+
 ```python
 from grimoire.canonical_schema import DangerType, DangerScores
 
@@ -123,6 +124,7 @@ scores.danger_institutional: float  # [0, 1]
 ```
 
 ### Guard Names
+
 ```python
 # 4 guards implemented in orchestrator
 "NO_EXECUTE_AMBIGUOUS"           # block execute if ambiguity ≥ 0.7
@@ -144,17 +146,17 @@ ambiguity_keywords:
   - maybe
   - probably
   - assume
-  
+
 adversarial_keywords:
   - bypass
   - exploit
   - attack
-  
+
 irreversibility_keywords:
   - delete
   - deploy
   - commit
-  
+
 institutional_keywords:
   - hire
   - fire
@@ -181,14 +183,14 @@ step_based_weight: 1.5          # Execute/decision = 1.5x
 # In ingestion pipeline (Phase 1)
 for record in hf_dataset:
     trace = normalize_record_to_trace(record)
-    
+
     # NEW: Classify immediately
     danger_scores = classifier.classify(
         text=trace.problem,
         context_role="goal"
     )
     trace.initial_danger = danger_scores
-    
+
     # Store
     persist_to_neo4j(trace)
     persist_to_qdrant(trace, danger_scores)
@@ -201,14 +203,14 @@ for record in hf_dataset:
 def can_transition(current_step: Step, proposed_step: Step, fsm_state: FSMState) -> bool:
     if not proposed_step.danger_scores:
         return True  # Not classified, allow
-    
+
     decision = orchestrator.check_transition(
         step_id=proposed_step.step_id,
         proposed_role=proposed_step.role,
         fsm_state=fsm_state,
         danger_scores=proposed_step.danger_scores
     )
-    
+
     if decision.allowed:
         return True
     else:

@@ -32,7 +32,8 @@ python -c "import pydantic, neo4j, qdrant_client; print('✓ Core packages ready
 ```
 
 **Key dependencies** (from `requirements.txt`):
-```
+
+```text
 pydantic==2.5.0
 neo4j==5.15.0
 qdrant-client==1.7.0
@@ -72,11 +73,12 @@ echo "✓ Neo4j ready at bolt://localhost:7687"
 
 1. Download from [neo4j.com/download](https://neo4j.com/download)
 2. Unzip and run: `./bin/neo4j console`
-3. Open browser: http://localhost:7474
+3. Open browser: <http://localhost:7474>
 4. Default: neo4j / neo4j (change password on first login)
 
 **Configuration** (verify in `.env`):
-```
+
+```text
 NEO4J_URI=neo4j://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password123
@@ -115,7 +117,8 @@ echo "✓ Qdrant running at http://localhost:6333"
 ```
 
 **Configuration**:
-```
+
+```text
 QDRANT_URL=http://localhost:6333
 ```
 
@@ -135,6 +138,7 @@ export TEXT_STORAGE_PATH=./local_storage
 ### For AWS S3 (Production)
 
 Create `.env.local`:
+
 ```bash
 AWS_ACCESS_KEY_ID=your_key_here
 AWS_SECRET_ACCESS_KEY=your_secret_here
@@ -444,7 +448,7 @@ python -m src.ingestion.ingest \
 
 ## Architecture Summary (Local Setup)
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │  Your Laptop                                            │
 │                                                         │
@@ -487,6 +491,7 @@ Scale to 1.2M ≈ 2 hours on laptop (can run overnight).
 ## Done! 🎉
 
 You should now have:
+
 - ✓ Neo4j running with schema constraints
 - ✓ Qdrant running with 'steps' collection
 - ✓ 100 traces ingested and queryable
@@ -494,6 +499,7 @@ You should now have:
 - ✓ Ready for Phase 2 safety analysis
 
 **Next command:**
+
 ```bash
 # Run a sample query
 python -c "

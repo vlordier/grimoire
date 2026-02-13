@@ -1,16 +1,19 @@
 # Feature 006-Pattern-Ranking: Score Extracted Patterns
 
 ## Feature Overview
+
 Score and rank extracted reasoning patterns by effectiveness, safety, and relevance to enable intelligent pattern recommendations and feedback-driven optimization.
 
 ## User Stories
 
 ### P1: Effectiveness Scoring
+
 **As a** system architect  
 **I want to** score patterns by their effectiveness (success rate, outcome quality, user satisfaction)  
 **So that** high-impact patterns are prioritized and recommended to users
 
 **Acceptance Criteria**:
+
 - Effectiveness score calculated from: success_rate (0-1), average_outcome_quality (0-10), user_satisfaction (0-5)
 - Weighted formula: (success_rate × 0.4) + (outcome_quality / 10 × 0.35) + (user_satisfaction / 5 × 0.25)
 - Score range: 0-1, updated on each feedback event
@@ -18,11 +21,13 @@ Score and rank extracted reasoning patterns by effectiveness, safety, and releva
 - Calculate with min 5 feedback events (statistical significance)
 
 ### P1: Safety Filtering
+
 **As a** risk officer  
 **I want to** filter patterns by danger scores (integrate Phase 2.1 danger classifier output)  
 **So that** high-danger patterns are flagged or excluded from recommendations
 
 **Acceptance Criteria**:
+
 - Integrate DangerScore from Phase 2.1 output
 - Patterns with ANY "CRITICAL" danger type: flagged (not recommended)
 - Patterns with ALL "MEDIUM" danger types: recommended with warning
@@ -30,33 +35,39 @@ Score and rank extracted reasoning patterns by effectiveness, safety, and releva
 - Pattern includes danger_context (why flagged if applicable)
 
 ### P1: FSM Context Integration
+
 **As a** reasoning engine  
 **I want to** weight pattern rankings by FSM context (from Phase 2.2)  
 **So that** patterns relevant to current FSM state are ranked higher
 
 **Acceptance Criteria**:
+
 - Integrate FSM type from Phase 2.2 (routing classification)
 - Add relevance_score: pattern_target_fsm_types ∩ current_fsm_types / |current_fsm_types|
 - Adjust ranking weight: effectiveness × (0.6 + 0.4 × relevance_score)
 - Store pattern→fsm_type relationship (many-to-many)
 
 ### P1: Cost-Based Ranking
+
 **As a** performance engineer  
 **I want to** factor computational cost into pattern rankings  
 **So that** efficient patterns are preferred during latency-sensitive operations
 
 **Acceptance Criteria**:
+
 - Measure execution_cost: avg latency (ms) + memory_peak (MB) / 1000 + error_rate (0-1) × 100
 - Cost score: 1 / (1 + execution_cost) (inverse sigmoid, 0-1 range)
 - Multi-rank formula: effectiveness × 0.4 + safety × 0.3 + cost × 0.3
 - Latency target <100ms for ranking 1M patterns
 
 ### P2: Domain Matching
+
 **As a** domain expert  
 **I want to** match patterns to specific problem domains (e.g., ML, finance, legal)  
 **So that** domain-relevant patterns are prioritized based on problem context
 
 **Acceptance Criteria**:
+
 - Domain tags: ["ml", "finance", "legal", "healthcare", "general"]
 - Patterns derived from traces tagged with domain metadata
 - Domain_match_score: problem_tags ∩ pattern_tags / |pattern_tags|

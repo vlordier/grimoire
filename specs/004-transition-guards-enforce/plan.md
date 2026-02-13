@@ -12,7 +12,7 @@
 
 Transition Guards enforce 4 safety rules on FSM state transitions using danger scores from Phase 2.1 + optional FSM context from Phase 2.2:
 
-```
+```text
 Step Creation Request
     ↓
 Extract: danger_scores, fsm_type
@@ -85,7 +85,7 @@ class TransitionGuard:
                 reason=f"Ambiguity score {step.danger_scores.danger_ambiguity:.2f} ≥ threshold (0.7); clarify problem first"
             )
         return GuardDecision(guard_name="NO_EXECUTE_AMBIGUOUS", allowed=True)
-    
+
     def check_no_irreversible_unverified(self, step: Step) -> GuardDecision:
         """Block execute if irreversible & no prior verification step."""
         if step.danger_scores.danger_irreversibility >= self.config.block_irreversibility_threshold:
@@ -98,7 +98,7 @@ class TransitionGuard:
                     reason="Irreversible action without verification; add verification step first"
                 )
         return GuardDecision(guard_name="NO_IRREVERSIBLE_UNVERIFIED", allowed=True)
-    
+
     def check_adversarial_requires_monitoring(self, step: Step) -> GuardDecision:
         """Escalate if adversarial ≥ threshold."""
         if step.danger_scores.danger_adversarial >= self.config.escalate_adversarial_threshold:
@@ -108,7 +108,7 @@ class TransitionGuard:
                 escalation_path="monitoring_queue"
             )
         return GuardDecision(guard_name="ADVERSARIAL_REQUIRES_MONITORING", allowed=True)
-    
+
     def check_institutional_requires_stakeholders(self, step: Step) -> GuardDecision:
         """Escalate if institutional ≥ threshold."""
         if step.danger_scores.danger_institutional >= self.config.escalate_institutional_threshold:
@@ -131,11 +131,11 @@ def check_transition(self, step: Step) -> TransitionGuardResponse:
         self.check_adversarial_requires_monitoring(step),
         self.check_institutional_requires_stakeholders(step),
     ]
-    
+
     # Find blocking decision
     blocking = [d for d in decisions if not d.allowed and d.decision_type == "BLOCK"]
     escalations = [d for d in decisions if d.escalation_path]
-    
+
     if blocking:
         return TransitionGuardResponse(
             allowed=False,
@@ -143,14 +143,14 @@ def check_transition(self, step: Step) -> TransitionGuardResponse:
             blocking_reason=blocking[0].reason,
             escalations=escalations
         )
-    
+
     if escalations:
         return TransitionGuardResponse(
             allowed=True,
             decision_type="ESCALATE",
             escalations=escalations
         )
-    
+
     return TransitionGuardResponse(
         allowed=True,
         decision_type="ALLOW",

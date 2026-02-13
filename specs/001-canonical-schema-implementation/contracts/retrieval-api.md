@@ -22,7 +22,7 @@ class QdrantConnection:
         api_key: Optional API key for cloud deployments
         """
         self.client = QdrantClient(url=url, api_key=api_key)
-    
+
     def health_check(self) -> bool:
         """Verify Qdrant server is healthy"""
         try:
@@ -43,7 +43,7 @@ def ensure_collections(qdrant_client: QdrantClient):
         ("step_windows", 384),    # FSM context windows
         ("patterns", 384)         # Pattern prototypes
     ]
-    
+
     for collection_name, dim in collections_config:
         try:
             qdrant_client.create_collection(
@@ -76,7 +76,7 @@ def index_step_embedding(
     """
     Store step embedding vector + searchable payload into 'steps' collection.
     Called by ingestion pipeline after generating embeddings.
-    
+
     Payload schema:
     - Identifiers: step_id, trace_id, index
     - Semantics: role, actor, domain, tags
@@ -89,28 +89,28 @@ def index_step_embedding(
             "step_id": step_id,
             "trace_id": trace_id,
             "index": step_metadata.get("index", 0),
-            
+
             # Semantics
             "role": step_metadata.get("role", "other"),
             "actor": step_metadata.get("actor", "system"),
             "domain": step_metadata.get("domain", "general"),
             "tags": step_metadata.get("tags", []),
-            
+
             # Danger markers (Phase 2: default to 0)
             "danger_ambiguity": step_metadata.get("danger_ambiguity", 0.0),
             "danger_adversarial": step_metadata.get("danger_adversarial", 0.0),
             "danger_irreversibility": step_metadata.get("danger_irreversibility", 0.0),
             "danger_institutional": step_metadata.get("danger_institutional", 0.0),
-            
+
             # Versioning
             "embedding_model": step_metadata.get("embedding_model", "all-MiniLM-L6-v2"),
             "embedding_dim": step_metadata.get("embedding_dim", 384),
             "text_hash": step_metadata.get("text_hash", None),
-            
+
             # Timestamps
             "created_at": datetime.now().isoformat()
         }
-        
+
         qdrant_client.upsert(
             collection_name="steps",
             points=[PointStruct(
@@ -119,10 +119,10 @@ def index_step_embedding(
                 payload=payload
             )]
         )
-        
+
         logger.debug(f"Indexed step {step_id} into Qdrant")
         return True
-    
+
     except Exception as e:
         logger.error(f"Failed to index step {step_id}: {e}")
         return False
@@ -141,21 +141,21 @@ from typing import Optional, List
 
 class StepSearchRequest(BaseModel):
     """Request: find steps similar to a query vector"""
-    
+
     query_vector: List[float] = Field(
         ...,
         description="Embedding vector (384-dim for all-MiniLM-L6-v2)",
         min_length=384,
         max_length=384
     )
-    
+
     limit: int = Field(
         default=10,
         ge=1,
         le=100,
         description="Max results to return"
     )
-    
+
     # Filters (all optional; combined with AND)
     filters: Optional[Dict[str, Any]] = Field(
         default=None,
@@ -184,29 +184,29 @@ def search_similar_steps(
     Semantic search: find steps closest to query_vector.
     Apply filters server-side for efficiency.
     """
-    
+
     # Build Qdrant filter from request
     conditions = []
-    
+
     if req.filters:
         if "domain" in req.filters:
             conditions.append(FieldCondition(
                 key="domain",
                 match=MatchValue(value=req.filters["domain"])
             ))
-        
+
         if "role" in req.filters:
             conditions.append(FieldCondition(
                 key="role",
                 match=MatchValue(value=req.filters["role"])
             ))
-        
+
         if "trace_id" in req.filters:
             conditions.append(FieldCondition(
                 key="trace_id",
                 match=MatchValue(value=req.filters["trace_id"])
             ))
-        
+
         if "danger_ambiguity" in req.filters:
             # Range filter: steps with danger_ambiguity >= threshold
             min_val = req.filters.get("min_danger_ambiguity", 0.0)
@@ -214,10 +214,10 @@ def search_similar_steps(
                 key="danger_ambiguity",
                 range=FieldCondition.RangeOptions(gte=min_val)
             ))
-    
+
     # Construct query filter
     query_filter = Filter(must=conditions) if conditions else None
-    
+
     # Execute search
     try:
         results = qdrant_client.search(
@@ -227,7 +227,7 @@ def search_similar_steps(
             limit=req.limit,
             with_payload=True
         )
-        
+
         # Transform to canonical response
         hits = [
             StepSearchHit(
@@ -245,13 +245,13 @@ def search_similar_steps(
             )
             for result in results
         ]
-        
+
         return StepSearchResponse(
             hits=hits,
             total=len(hits),
             query_time_ms=0  # Qdrant doesn't expose this; estimate later
         )
-    
+
     except Exception as e:
         logger.error(f"Step search failed: {e}")
         return StepSearchResponse(hits=[], total=0, error=str(e))
@@ -259,7 +259,7 @@ def search_similar_steps(
 
 class StepSearchHit(BaseModel):
     """Single search result"""
-    
+
     step_id: str
     trace_id: str
     role: str
@@ -276,7 +276,7 @@ class StepSearchHit(BaseModel):
 
 class StepSearchResponse(BaseModel):
     """Response: ranked list of similar steps"""
-    
+
     hits: List[StepSearchHit] = Field(
         description="Ranked by similarity (highest first)"
     )
@@ -317,24 +317,24 @@ class StepSearchResponse(BaseModel):
 ```python
 class PatternSearchRequest(BaseModel):
     """Request: find applicable patterns for current context"""
-    
+
     query_vector: List[float] = Field(
         ...,
         description="Embedding of current FSM state + recent steps",
         min_length=384,
         max_length=384
     )
-    
+
     fsm_id: Optional[str] = Field(
         default=None,
         description="Active FSM (e.g., 'fsm_diagnose_fix')"
     )
-    
+
     current_state: Optional[str] = Field(
         default=None,
         description="Current FSM state (e.g., 'S6_evaluate')"
     )
-    
+
     limit: int = Field(
         default=5,
         ge=1,
@@ -360,23 +360,23 @@ def search_patterns(
     Find patterns applicable to current FSM + state.
     Patterns embedding captures: template semantics + applicability constraints.
     """
-    
+
     conditions = []
-    
+
     if req.fsm_id:
         conditions.append(FieldCondition(
             key="fsm_id",
             match=MatchValue(value=req.fsm_id)
         ))
-    
+
     if req.current_state:
         conditions.append(FieldCondition(
             key="allowed_states",
             match=MatchValue(value=req.current_state)
         ))
-    
+
     query_filter = Filter(must=conditions) if conditions else None
-    
+
     try:
         results = qdrant_client.search(
             collection_name="patterns",
@@ -385,7 +385,7 @@ def search_patterns(
             limit=req.limit,
             with_payload=True
         )
-        
+
         hits = [
             PatternSearchHit(
                 pattern_id=result.payload.get("pattern_id"),
@@ -396,9 +396,9 @@ def search_patterns(
             )
             for result in results
         ]
-        
+
         return PatternSearchResponse(hits=hits, total=len(hits))
-    
+
     except Exception as e:
         logger.error(f"Pattern search failed: {e}")
         return PatternSearchResponse(hits=[], total=0, error=str(e))
@@ -427,7 +427,7 @@ class PatternSearchResponse(BaseModel):
 ```python
 class PaginatedStepSearchRequest(StepSearchRequest):
     """Add cursor for large result sets"""
-    
+
     cursor: Optional[str] = Field(
         default=None,
         description="Opaque cursor for fetching next page (from previous response)"
@@ -436,12 +436,12 @@ class PaginatedStepSearchRequest(StepSearchRequest):
 
 class PaginatedStepSearchResponse(StepSearchResponse):
     """Add cursor for large result sets"""
-    
+
     next_cursor: Optional[str] = Field(
         default=None,
         description="Cursor to fetch next page (None = no more results)"
     )
-    
+
     has_more: bool = Field(
         description="Whether more results exist"
     )

@@ -10,7 +10,7 @@
 
 Phase 3 builds the **optimization plane** that learns from past reasoning and improves future decisions:
 
-```
+```text
 Completed Reasoning Traces (Phase 1, 2)
     ↓
 [Extract Patterns] ← What sequence of steps worked well?
@@ -37,13 +37,15 @@ Completed Reasoning Traces (Phase 1, 2)
 **Purpose**: Identify recurring multi-step solution patterns from historical reasoning traces.
 
 **What it does**:
+
 - Scan historical traces for common step sequences
 - Cluster similar sequences into **Patterns**
 - Extract: problem type, FSM used, danger profile, steps taken, outcome
 - Store patterns in dedicated Neo4j nodes + Qdrant vectors
 
 **Example**:
-```
+
+```text
 Problem: "Database queries timeout under load"
 FSM: diagnose_fix
 Danger: ambiguity=0.2, irreversibility=0.8
@@ -55,7 +57,7 @@ Pattern: DIAGNOSE_TIMEOUT_INDEXING
     3. PLAN: "Add indexes to frequently queried columns"
     4. EXECUTE: "Deploy index changes"
     5. VERIFY: "Rerun queries, confirm performance"
-  
+
   Outcomes:
     - Success rate: 85% (17/20 similar problems resolved same way)
     - Avg time-to-solution: 6 hours
@@ -64,12 +66,14 @@ Pattern: DIAGNOSE_TIMEOUT_INDEXING
 ```
 
 **Key Deliverables**:
+
 - Pattern schema (Neo4j + Qdrant)
 - Extraction algorithm (find common subgraph sequences)
 - Clustering logic (group by FSM + problem keywords + outcome)
 - Deduplication (recognize same pattern, different wording)
 
 **Effort Estimate**: 8-12 days
+
 - Days 1-3: Schema design (Pattern, PatternMatch, PatternUse entities)
 - Days 3-5: Extraction algorithm (subgraph matching + clustering)
 - Days 5-8: Integration with Phase 1 (backfill historical traces)
@@ -77,6 +81,7 @@ Pattern: DIAGNOSE_TIMEOUT_INDEXING
 - Days 10-12: Performance optimization (1M+ traces)
 
 **Success Criteria**:
+
 - [ ] Extract 50+ distinct patterns from Phase 1 data
 - [ ] Patterns have >70% accuracy (same pattern solves similar problems)
 - [ ] Execution time < 30ms per trace queried
@@ -89,12 +94,14 @@ Pattern: DIAGNOSE_TIMEOUT_INDEXING
 **Purpose**: Rank extracted patterns by how likely they are to succeed on similar problems.
 
 **What it does**:
+
 - Score each pattern on: **effectiveness** (success rate), **safety** (danger compatibility), **cost** (time/resources)
 - Weight scores by: FSM alignment, danger profile match, domain similarity
 - Produce ranking: top patterns for each problem class
 
 **Example Scoring**:
-```
+
+```text
 Problem: "Database timeout" (ambiguity=0.2)
 
 Candidate patterns:
@@ -104,14 +111,14 @@ Candidate patterns:
      - Cost: 0.90 (fast, cheap)
      - Domain match: "database" = perfect
      → Final score: 0.90 (weighted avg)
-  
+
   2. OPTIMIZE_QUERY_REWRITE
      - Effectiveness: 0.70
      - Safety: 0.80
      - Cost: 0.60 (slower)
      - Domain match: "database" = perfect
      → Final score: 0.70
-  
+
   3. SCALE_HORIZONTALLY_CACHE
      - Effectiveness: 0.60
      - Safety: 0.70
@@ -123,6 +130,7 @@ Recommendation: Use DIAGNOSE_TIMEOUT_INDEXING (score: 0.90)
 ```
 
 **Key Deliverables**:
+
 - Effectiveness score: success_rate(pattern) on similar problems
 - Safety score: pattern compatible with danger profile?
 - Cost function: (time + resource_usage) / effectiveness
@@ -130,12 +138,14 @@ Recommendation: Use DIAGNOSE_TIMEOUT_INDEXING (score: 0.90)
 - Ranking API: `rank_patterns(problem, fsm_type, danger_scores) → List[RankedPattern]`
 
 **Effort Estimate**: 6-8 days
+
 - Days 1-2: Score function design
 - Days 2-4: Integration with Phase 2 (FSM alignment, danger compatibility)
 - Days 4-6: Weighting tuning (A/B test different weights on test set)
 - Days 6-8: Performance + caching (pattern rankings should be cached)
 
 **Success Criteria**:
+
 - [ ] Ranking correlates with human preference (80%+ agreement on test set)
 - [ ] Top-ranked patterns have >80% success rate on similar problems
 - [ ] Ranking API latency < 100ms (cached)
@@ -148,6 +158,7 @@ Recommendation: Use DIAGNOSE_TIMEOUT_INDEXING (score: 0.90)
 **Purpose**: Close the loop: track if recommended patterns are followed, measure outcomes, improve scoring.
 
 **What it does**:
+
 - Log when patterns are recommended vs followed
 - Track outcomes (problem solved? How long? Any issues?)
 - Compute pattern effectiveness over time (sliding window: last 30 uses)
@@ -155,7 +166,8 @@ Recommendation: Use DIAGNOSE_TIMEOUT_INDEXING (score: 0.90)
 - A/B test scoring weights on new incoming problems
 
 **Example**:
-```
+
+```text
 Recommended pattern: DIAGNOSE_TIMEOUT_INDEXING
 Probability user follows: 60% (historically)
 Expected outcome if followed: Success (0.85 expected)
@@ -174,6 +186,7 @@ Recommendation: Increase boost for "check existing indexes first" heuristic
 ```
 
 **Key Deliverables**:
+
 - Recommendation logger (what pattern was suggested, confidence, FSM context)
 - Outcome tracker (was it followed? Did it work? How long?)
 - Effectiveness updater (running average over time)
@@ -182,6 +195,7 @@ Recommendation: Increase boost for "check existing indexes first" heuristic
 - Feedback dashboard (show pattern usage, effectiveness trends, learning curve)
 
 **Effort Estimate**: 7-10 days
+
 - Days 1-2: Logging schema (RecommendationEvent, OutcomeEvent)
 - Days 2-4: Outcome tracking integration (feedback from users/system)
 - Days 4-6: Effectiveness updater (sliding window, concept drift)
@@ -189,6 +203,7 @@ Recommendation: Increase boost for "check existing indexes first" heuristic
 - Days 8-10: Dashboard + monitoring
 
 **Success Criteria**:
+
 - [ ] 100% of recommendations logged
 - [ ] 90% outcome tracking rate (know if pattern was followed + result)
 - [ ] Pattern effectiveness scores update within 24 hours
@@ -201,7 +216,7 @@ Recommendation: Increase boost for "check existing indexes first" heuristic
 
 ### Critical Path
 
-```
+```text
 Phase 1 (Complete) ──────────────────────────────────────┐
                                                           ↓
 Phase 2 (In Progress: 002, 003, 004)                      │
@@ -224,11 +239,13 @@ Recommended Sequencing:
 ### Interaction Between Phases
 
 **Phase 2 → Phase 3 Data Flow**:
+
 - Danger scores → Pattern scoring (filter by danger compatibility)
 - FSM type → Pattern classification & ranking (FSM alignment)
 - Guard decisions → Pattern safety assessment (learn which guards fail)
 
 **Phase 3 → Phase 2 Feedback**:
+
 - Pattern effectiveness → Refine danger thresholds (if patterns show lower threshold works better)
 - Recommendation feedback → Improve FSM routing (if wrong FSM recommended for patterns)
 
@@ -259,7 +276,7 @@ Pattern(
 
 ### PatternMatch (Edge)
 
-```
+```text
 Trace ---(MATCHED_PATTERN)---> Pattern
   with properties:
     - match_score: 0.0-1.0 (how closely did trace follow pattern?)
@@ -290,14 +307,14 @@ RankedPattern(
 
 ### Danger Classifier → Pattern Safety Filtering
 
-```
+```text
 Problem: "Deploy new config to production" (institutional=0.8)
 
 Candidate patterns:
   1. DEPLOY_WITH_GRADUAL_ROLLOUT
      - Expected danger: institutional=0.7 ✓ (compatible)
      - Confidence: High
-  
+
   2. DEPLOY_ALL_AT_ONCE
      - Expected danger: institutional=0.95 ✗ (too risky)
      - Guard recommendation: INSTITUTIONAL_REQUIRES_STAKEHOLDERS
@@ -306,7 +323,7 @@ Candidate patterns:
 
 ### FSM Router → Pattern Classification
 
-```
+```text
 Problem routed to: fsm_design_decide
 
 Search for patterns:
@@ -317,7 +334,7 @@ Search for patterns:
 
 ### Transition Guards → Pattern Validation
 
-```
+```text
 Pattern: EXECUTE_IRREVERSIBLE_ACTION
   - Requires prior VERIFY step (NO_IRREVERSIBLE_UNVERIFIED guard)
   - Requires low ambiguity (NO_EXECUTE_AMBIGUOUS guard)
@@ -381,24 +398,28 @@ Pattern: EXECUTE_IRREVERSIBLE_ACTION
 ### Phase 3 Strategy: **Quick Win + Long Tail**
 
 **Week 1 (Days 1-5): Pattern Extraction MVP**
+
 - Extract basic patterns from Phase 1 data
 - Deduplication + clustering
 - Initial pattern storage
 - Goal: 30-50 patterns identified
 
 **Week 2 (Days 6-12): Pattern Ranking**
+
 - Implement scoring functions
 - Integrate danger + FSM context
 - Build ranking API
 - Goal: Ranked recommendations working
 
 **Week 3 (Days 13-21): Optimization Loop + Refinement**
+
 - Outcome tracking
 - Effectiveness updates
 - Feedback dashboard
 - Goal: Learning loop closed + patterns improving
 
 **Week 4+ (Days 21+): Tuning + Scaling**
+
 - Concept drift detection tuning
 - Performance optimization for 1M+ traces
 - Dashboard + monitoring
@@ -421,6 +442,7 @@ Pattern: EXECUTE_IRREVERSIBLE_ACTION
 ## Phase 3 Planning Artifacts
 
 **To Create (This Sprint)**:
+
 - [ ] Feature branch 005-pattern-extraction
 - [ ] Feature branch 006-pattern-ranking
 - [ ] Feature branch 007-optimization-loop
@@ -429,6 +451,7 @@ Pattern: EXECUTE_IRREVERSIBLE_ACTION
 - [ ] Database schema (Pattern entities + edges)
 
 **Already Complete**:
+
 - ✅ Phase 1 data (100K+ traces) available for pattern extraction
 - ✅ Phase 2 (danger + FSM) context ready to integrate
 - ✅ Canonical schemas (Pattern, PatternMatch model patterns)

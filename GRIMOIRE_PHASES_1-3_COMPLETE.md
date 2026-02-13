@@ -27,6 +27,7 @@
 ### Phase 1 (Complete ✅)
 
 **Deliverables**:
+
 - ✅ 10 specification files (spec, plan, research, data-model, quickstart, etc.)
 - ✅ 5 API contracts (ingestion, retrieval, storage, text-versioning)
 - ✅ All 34 issues resolved ✅
@@ -34,6 +35,7 @@
 - ✅ Production-ready: Neo4j 5.x, Qdrant 1.7+, Python 3.11+
 
 **APIs**:
+
 - Ingestion: HuggingFace traces → canonical TraceBundle
 - Retrieval: Vector search (Qdrant) + property filtering
 - Storage: Atomic Neo4j persistence with ACID guarantees
@@ -46,6 +48,7 @@
 ### Phase 2 (Specifications Validated ✅)
 
 **Deliverables**:
+
 - ✅ 15 specification files (~5,600 lines)
 - ✅ 3 feature branches (002-004)
 - ✅ Validation completed: 21 minor issues (non-blocking)
@@ -55,6 +58,7 @@
 **Features**:
 
 **002-Danger-Classifier** (`002-danger-router-classify`)
+
 - 8 user stories, 6 files
 - Keyword-based detection: 4 danger types (CRITICAL, HIGH, MEDIUM, LOW)
 - Guards enforcement: prevent execution of dangerous patterns
@@ -62,6 +66,7 @@
 - Effort: 7-11 days
 
 **003-FSM-Router** (`003-fsm-router-classify`)
+
 - 8 user stories, 5 files
 - 10 FSM types (e.g., DECISION, ITERATION, RECURSION, BRANCHING, etc.)
 - Hot-loadable config (routing_config.yaml)
@@ -69,6 +74,7 @@
 - Effort: 4-6 days
 
 **004-Transition-Guards** (`004-transition-guards-enforce`)
+
 - 6 user stories, 3 files
 - 4 safety guards: NO_EXECUTE_AMBIGUOUS, NO_IRREVERSIBLE_UNVERIFIED, ADVERSARIAL_REQUIRES_MONITORING, INSTITUTIONAL_REQUIRES_STAKEHOLDERS
 - Aggregated decision logic + escalations
@@ -77,6 +83,7 @@
 **Status**: All validated ✅ — ready for implementation handoff
 
 **Validation Report**: `validate_phase2_specs.py` (custom Python script)
+
 - Checked: required files, section structure, user stories, data models
 - Result: 21 issues (98% pass rate, issues are detection artifacts not content gaps)
 - Conclusion: **Specs approved for implementation**
@@ -86,6 +93,7 @@
 ### Phase 3 (Planning Complete ✅)
 
 **Deliverables**:
+
 - ✅ 3 comprehensive feature specifications (005-007)
 - ✅ 6+ spec files (~3,200+ lines initial specs)
 - ✅ 3 feature branches (005, 006, 008)
@@ -95,6 +103,7 @@
 **Features**:
 
 **005-Pattern-Extraction** (`005-pattern-extraction-discover`)
+
 - Specification: ✅ spec.md (180 lines) + plan.md (280 lines)
 - 5 user stories (P1: 4, P2: 1)
 - Algorithm: Subgraph matching + fuzzy deduplication (90% accuracy)
@@ -103,6 +112,7 @@
 - Depends on: Phase 1 traces (ready ✅)
 
 **006-Pattern-Ranking** (`006-pattern-ranking-score`)
+
 - Specification: ✅ spec.md (200 lines) + plan.md (250 lines)
 - 5 user stories (P1: 4, P2: 1)
 - Multi-objective scoring: effectiveness (0.4) + safety (0.3) + cost (0.3)
@@ -112,6 +122,7 @@
 - Depends on: Phase 3.1 patterns + Phase 2.1-2.2 outputs
 
 **007-Optimization-Loop** (`008-optimization-loop-feedback`)
+
 - Specification: ✅ spec.md (210 lines) + plan.md (260 lines)
 - 5 user stories (P1: 4, P2: 1)
 - Feedback pipeline: 99.9% reliability, async buffering
@@ -130,19 +141,23 @@
 ## Documentation Artifacts Created
 
 ### Phase 1 Analysis
+
 - `PHASE_1_COMPLETION.md` — 280 lines, comprehensive completion review
 
 ### Phase 2 Analysis
+
 - `PHASE_2_ANALYSIS.md` — 340 lines, feature comparison + recommendations
 - `PHASE_2_PLANNING_COMPLETE.md` — 340 lines, masterplan + testing strategy
 - `validate_phase2_specs.py` — 250 lines, custom validation script
 - Validation results: 21 minor issues (non-blocking) ✅
 
 ### Phase 3 Analysis
+
 - `PHASE_3_ANALYSIS.md` — 500+ lines, feature analysis + architecture
 - `PHASE_3_PLANNING_COMPLETE.md` — 600+ lines, comprehensive roadmap (this document)
 
 ### Specification Files
+
 - **Phase 1**: 10 files (complete)
 - **Phase 2**: 15 files (spec, plan, research, data-model, quickstart, contracts)
 - **Phase 3**: 6+ files (spec + plan for 003 features; research + data-model queued)
@@ -153,7 +168,7 @@
 
 ## Integration Roadmap
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │ GRIMOIRE: Continuously Improving Reasoning Engine           │
 └─────────────────────────────────────────────────────────────┘
@@ -239,6 +254,7 @@ Feedback Loop (Continuous): 3.3 ← Pattern Execution → 3.1 ← Extraction
 ## Success Criteria Checklist
 
 ### Phase 1 ✅
+
 - [x] Canonical schemas defined + implemented
 - [x] Ingestion API working (HuggingFace → canonical)
 - [x] Retrieval API working (search + filter)
@@ -247,6 +263,7 @@ Feedback Loop (Continuous): 3.3 ← Pattern Execution → 3.1 ← Extraction
 - [x] Production-ready validation
 
 ### Phase 2 (Ready for Implementation)
+
 - [x] 3 features fully specified (15 files, ~5,600 lines)
 - [x] Specs validated (21 minor issues, non-blocking)
 - [x] Data models finalized (Pydantic v2)
@@ -255,6 +272,7 @@ Feedback Loop (Continuous): 3.3 ← Pattern Execution → 3.1 ← Extraction
 - [ ] Integration tests passing (NEXT: start test)
 
 ### Phase 3 (Ready for Detailed Planning)
+
 - [x] 3 features fully planned (6+ files, ~3,200+ lines)
 - [x] Architecture validated (data flows, integration points)
 - [x] High-level risks identified + mitigations documented
@@ -267,6 +285,7 @@ Feedback Loop (Continuous): 3.3 ← Pattern Execution → 3.1 ← Extraction
 ## Implementation Readiness
 
 ### Go/No-Go: Phase 2 Development ✅ GO
+
 - ✅ Specifications complete + validated
 - ✅ Validation script passed (21 minor issues, approved)
 - ✅ Pydantic v2 models defined
@@ -278,6 +297,7 @@ Feedback Loop (Continuous): 3.3 ← Pattern Execution → 3.1 ← Extraction
 **Recommendation**: Start Phase 2.1 implementation NOW (danger classifier is independent)
 
 ### Go/No-Go: Phase 3.1 Development ⏳ CONDITIONAL
+
 - ✅ Specifications complete
 - ✅ Architecture validated
 - ⏳ Phase 1 availability confirmed ✅
@@ -303,10 +323,11 @@ Feedback Loop (Continuous): 3.3 ← Pattern Execution → 3.1 ← Extraction
 
 ---
 
-## What's Next?
+## What's Next
 
 ### Option A: Sequential (Safe)
-```
+
+```text
 Week 1-2: Phase 2 implementation (danger, FSM, guards)
 Week 3: Phase 2 integration + testing
 Week 4-6: Phase 3.1-3.2 implementation (pattern extraction + ranking)
@@ -315,7 +336,8 @@ Timeline: ~8 weeks total (safe, lower risk)
 ```
 
 ### Option B: Parallel (Aggressive)
-```
+
+```text
 Week 1-2: Phase 2 implementation + Phase 3 final specs (research + data-model)
 Week 3: Phase 2 integration, Phase 3.1 design spike
 Week 3-4: Phase 3.1-3.2 implementation starts (parallel with Phase 2 testing)
@@ -324,6 +346,7 @@ Timeline: ~5-6 weeks total (aggressive, higher risk)
 ```
 
 ### Recommended: Path A (Sequential)
+
 - Phase 2 is independent, can be fully implemented/validated in parallel
 - Phase 3 depends on Phase 2 (danger scores + FSM types for ranking)
 - Safer: allows quality validation before moving forward
@@ -344,4 +367,3 @@ Timeline: ~5-6 weeks total (aggressive, higher risk)
 **Total Work Documented**: 30+ spec files, 15,000+ lines, 7 feature branches
 
 **Next Decision**: Do we proceed with Phase 2 implementation now (recommended) or wait for Phase 3 review?
-

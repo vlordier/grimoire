@@ -18,34 +18,34 @@ from enum import Enum
 
 class FSMType(str, Enum):
     """10 universal FSM types from reference implementation."""
-    
+
     CLARIFY_FRAME = "fsm_clarify_frame"
     """Narrow scope, define success criteria."""
-    
+
     DIAGNOSE_FIX = "fsm_diagnose_fix"
     """Find root cause, apply fix, verify."""
-    
+
     DESIGN_DECIDE = "fsm_design_decide"
     """Explore options, evaluate trade-offs, decide."""
-    
+
     OPTIMIZE = "fsm_optimize"
     """Tune parameters, measure, iterate."""
-    
+
     VERIFY = "fsm_verify"
     """Test hypothesis, check all cases."""
-    
+
     TRANSFORM = "fsm_transform"
     """Reshape problem structure."""
-    
+
     OPERATE_HARDEN = "fsm_operate_harden"
     """Stabilize system, prepare for production."""
-    
+
     POSTMORTEM = "fsm_postmortem"
     """Analyze failure, extract lessons."""
-    
+
     RESOLVE_CONFLICT = "fsm_resolve_conflict"
     """Negotiate constraints, find consensus."""
-    
+
     ADVERSARIAL_LOOP = "fsm_adversarial_loop"
     """Anticipate attacks, strengthen defense."""
 
@@ -67,7 +67,7 @@ from pydantic import BaseModel, Field
 
 class FSMRouterRequest(BaseModel):
     """Request to route a problem to an appropriate FSM."""
-    
+
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "trace_id": "trace-001-abcd",
@@ -78,25 +78,25 @@ class FSMRouterRequest(BaseModel):
             }
         }
     })
-    
+
     trace_id: str = Field(
         ...,
         description="Unique trace identifier",
         pattern=r"^trace-[\d]{3}-[a-z]{4}$|^[a-f0-9-]{36}$"
     )
-    
+
     problem_text: str = Field(
         ...,
         description="Problem or goal statement to classify",
         min_length=10,
         max_length=5000
     )
-    
+
     context: Optional[Dict[str, str]] = Field(
         default=None,
         description="Optional context (domain, user_level, language, etc.)"
     )
-    
+
     optional_fsm_hints: Optional[List[FSMType]] = Field(
         default=None,
         description="User hints for FSM selection (e.g., ['fsm_diagnose_fix', 'fsm_optimize'])"
@@ -122,7 +122,7 @@ Core routing decision.
 ```python
 class FSMRoute(BaseModel):
     """A single FSM routing decision with confidence and alternatives."""
-    
+
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "selected_fsm_id": "fsm_diagnose_fix",
@@ -139,35 +139,35 @@ class FSMRoute(BaseModel):
             ]
         }
     })
-    
+
     selected_fsm_id: FSMType = Field(
         ...,
         description="Primary FSM type selected"
     )
-    
+
     selected_fsm_name: str = Field(
         ...,
         description="Human-readable FSM name",
         examples=["Diagnose & Fix", "Design & Decide", "Optimize"]
     )
-    
+
     confidence: float = Field(
         ...,
         description="Confidence in selection [0, 1]",
         ge=0.0,
         le=1.0
     )
-    
+
     reasoning: str = Field(
         ...,
         description="Explanation for why this FSM was selected"
     )
-    
+
     alternative_fsms: List[Dict[str, any]] = Field(
         default_factory=list,
         description="Top 2-3 alternative FSMs with confidences"
     )
-    
+
     @field_validator("confidence")
     @classmethod
     def validate_confidence(cls, v):
@@ -175,7 +175,7 @@ class FSMRoute(BaseModel):
         if not (0.0 <= v <= 1.0):
             raise ValueError("Confidence must be between 0.0 and 1.0")
         return v
-    
+
     @field_validator("selected_fsm_name")
     @classmethod
     def validate_fsm_name_not_empty(cls, v):
@@ -196,7 +196,7 @@ from datetime import datetime
 
 class FSMRouterResponse(BaseModel):
     """Response from FSM Router with routing decision."""
-    
+
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "trace_id": "trace-001-abcd",
@@ -211,33 +211,33 @@ class FSMRouterResponse(BaseModel):
             "computed_at": "2024-01-15T10:30:45.123456Z"
         }
     })
-    
+
     trace_id: str = Field(
         ...,
         description="Echo of input trace_id"
     )
-    
+
     route: FSMRoute = Field(
         ...,
         description="Primary routing decision"
     )
-    
+
     routing_ms: int = Field(
         ...,
         description="Time to compute routing (milliseconds)",
         ge=0
     )
-    
+
     router_version: str = Field(
         default="1.0.0",
         description="Router implementation version"
     )
-    
+
     computed_at: datetime = Field(
         default_factory=datetime.utcnow,
         description="ISO 8601 timestamp when routing was computed"
     )
-    
+
     @field_validator("routing_ms")
     @classmethod
     def validate_latency(cls, v):
@@ -262,7 +262,7 @@ from typing import Dict, List
 
 class RoutingConfig(BaseModel):
     """Configuration for FSM routing (keyword-based, v1)."""
-    
+
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "fsm_keywords": {
@@ -274,29 +274,29 @@ class RoutingConfig(BaseModel):
             "keyword_weights": {}
         }
     })
-    
+
     fsm_keywords: Dict[str, List[str]] = Field(
         ...,
         description="Mapping from FSM type to keyword list"
     )
-    
+
     confidence_threshold: float = Field(
         default=0.5,
         description="Threshold below which to fallback to default FSM",
         ge=0.0,
         le=1.0
     )
-    
+
     default_fsm: FSMType = Field(
         default=FSMType.CLARIFY_FRAME,
         description="Default FSM if confidence too low"
     )
-    
+
     keyword_weights: Dict[str, float] = Field(
         default_factory=dict,
         description="Optional weights per keyword (if keywords vary in importance)"
     )
-    
+
     @model_validator(mode="after")
     def validate_config(self):
         """Validate that default FSM is in the FSM types."""
@@ -304,7 +304,7 @@ class RoutingConfig(BaseModel):
         if str(self.default_fsm.value) not in [str(t.value) for t in fsm_ids]:
             raise ValueError(f"Default FSM {self.default_fsm} not in known FSM types")
         return self
-    
+
     @field_validator("confidence_threshold")
     @classmethod
     def validate_threshold(cls, v):
@@ -352,14 +352,14 @@ Route multiple problems in a batch.
 ```python
 class FSMRouterBatchRequest(BaseModel):
     """Batch request for routing multiple problems."""
-    
+
     traces: List[FSMRouterRequest] = Field(
         ...,
         description="Problems to route",
         min_items=1,
         max_items=1000
     )
-    
+
     parallel: bool = Field(
         default=True,
         description="Whether to process traces in parallel"
@@ -368,17 +368,17 @@ class FSMRouterBatchRequest(BaseModel):
 
 class FSMRouterBatchResponse(BaseModel):
     """Batch response with routing results."""
-    
+
     results: List[FSMRouterResponse] = Field(
         ...,
         description="Routing results for each input"
     )
-    
+
     failed: List[Dict[str, any]] = Field(
         default_factory=list,
         description="Failed requests (trace_id, error)"
     )
-    
+
     total_ms: int = Field(
         ...,
         description="Total batch processing time"
@@ -454,11 +454,13 @@ print(schema)
 
 ## Integration with Phase 1
 
-**Input Source**: 
+**Input Source**:
+
 - `TraceBundle.problem` → `FSMRouterRequest.problem_text`
 - `Trace.trace_id` → `FSMRouterRequest.trace_id`
 
 **Output Target**:
+
 - `FSMRouterResponse.route.selected_fsm_id` → saved to `Step.fsm_type` (Neo4j)
 - `FSMRouterResponse.route.confidence` → saved to `Step.fsm_confidence`
 

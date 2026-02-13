@@ -22,7 +22,7 @@
 
 ### 1. Route Single Problem
 
-```
+```text
 POST /v1/route
 ```
 
@@ -68,7 +68,7 @@ POST /v1/route
 
 ### 2. Route Batch Problems
 
-```
+```text
 POST /v1/route/batch
 ```
 
@@ -123,7 +123,7 @@ POST /v1/route/batch
 
 ### 3. Get Configuration
 
-```
+```text
 GET /v1/config
 ```
 
@@ -180,7 +180,7 @@ GET /v1/config
 
 ### 4. Update Configuration
 
-```
+```text
 PUT /v1/config
 ```
 
@@ -214,7 +214,7 @@ PUT /v1/config
 
 ### 5. Health Check
 
-```
+```text
 GET /v1/health
 ```
 
@@ -289,23 +289,23 @@ GET /v1/health
 
 ### FSMRouterRequest
 
-```
+```text
 {
   "trace_id": string (required)
     format: "trace-NNN-XXXX" or UUID
     example: "trace-001-abcd"
-  
+
   "problem_text": string (required)
     minLength: 10
     maxLength: 5000
     example: "Debug the timeout issue"
-  
+
   "context": object (optional)
     properties:
       "domain": string (optional) - backend, frontend, data, etc.
       "user_level": string (optional) - junior, senior, architect
       "language": string (optional) - en, es, fr, etc.
-  
+
   "optional_fsm_hints": array (optional)
     items: string
     values: ["fsm_diagnose_fix", "fsm_design_decide", ...]
@@ -315,10 +315,10 @@ GET /v1/health
 
 ### FSMRouterResponse
 
-```
+```text
 {
   "trace_id": string
-  
+
   "route": {
     "selected_fsm_id": string - enum of 10 FSM types
     "selected_fsm_name": string - human-readable name
@@ -332,7 +332,7 @@ GET /v1/health
       }
     ]
   }
-  
+
   "routing_ms": integer - latency in milliseconds
   "router_version": string - "1.0.0"
   "computed_at": string - ISO 8601 timestamp
@@ -351,7 +351,7 @@ import requests
 class FSMRouterClient:
     def __init__(self, base_url="http://localhost:8000"):
         self.base_url = base_url
-    
+
     def route(self, trace_id: str, problem_text: str) -> dict:
         """Route a single problem."""
         response = requests.post(
@@ -363,7 +363,7 @@ class FSMRouterClient:
         )
         response.raise_for_status()
         return response.json()
-    
+
     def route_batch(self, traces: list) -> dict:
         """Route multiple problems."""
         response = requests.post(
@@ -372,13 +372,13 @@ class FSMRouterClient:
         )
         response.raise_for_status()
         return response.json()
-    
+
     def get_config(self) -> dict:
         """Get current configuration."""
         response = requests.get(f"{self.base_url}/v1/config")
         response.raise_for_status()
         return response.json()
-    
+
     def update_config(self, updates: dict) -> dict:
         """Update configuration."""
         response = requests.put(
@@ -403,20 +403,20 @@ print(response["route"]["selected_fsm_id"])  # fsm_diagnose_fix
 # In grimoire_ingestion.py
 def process_trace_with_fsm_routing(trace: Trace):
     """Add FSM routing to trace processing."""
-    
+
     # Call FSM Router
     router_response = fsm_router_client.route(
         trace_id=trace.trace_id,
         problem_text=trace.problem
     )
-    
+
     # Attach FSM to trace
     trace.fsm_type = router_response["route"]["selected_fsm_id"]
     trace.fsm_confidence = router_response["route"]["confidence"]
-    
+
     # Store in Neo4j
     neo4j.create_trace_with_fsm(trace)
-    
+
     return trace
 ```
 
@@ -429,7 +429,7 @@ def check_transition_with_fsm_context(
     fsm_router_client
 ) -> GuardDecision:
     """Check transition using FSM type context."""
-    
+
     # Get FSM for step's trace
     if not step.fsm_type:
         routing = fsm_router_client.route(
@@ -439,7 +439,7 @@ def check_transition_with_fsm_context(
         fsm_type = routing["route"]["selected_fsm_id"]
     else:
         fsm_type = step.fsm_type
-    
+
     # Apply FSM-specific guards
     if fsm_type == "fsm_diagnose_fix":
         # Diagnose problems: require evidence/analysis before jumping to solutions
@@ -448,7 +448,7 @@ def check_transition_with_fsm_context(
                 allowed=False,
                 reason="Diagnose FSM: must complete analysis before execution"
             )
-    
+
     elif fsm_type == "fsm_design_decide":
         # Design problems: require exploration before decision
         if step.role == "execute" and step.step_number < 3:
@@ -456,7 +456,7 @@ def check_transition_with_fsm_context(
                 allowed=False,
                 reason="Design FSM: insufficient exploration before decision"
             )
-    
+
     return GuardDecision(allowed=True)
 ```
 
@@ -474,7 +474,7 @@ def check_transition_with_fsm_context(
 
 ## Rate Limiting
 
-```
+```text
 X-RateLimit-Limit: 10000
 X-RateLimit-Remaining: 9999
 X-RateLimit-Reset: 1705317045
@@ -492,6 +492,7 @@ Burst: up to 500 requests
 **Planned**: v2.0 (LLM-based routing for higher accuracy)
 
 **Migration Path**:
+
 - v1.0 API stays stable
 - v2.0 uses same `/v1/route` endpoint
 - Only backend scorer implementation changes

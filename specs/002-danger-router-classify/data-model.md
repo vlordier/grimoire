@@ -32,7 +32,7 @@ from datetime import datetime
 
 class EvidenceSpan(BaseModel):
     """Single evidence point for a danger score"""
-    
+
     text_span: str = Field(
         description="Quoted text supporting the danger classification"
     )
@@ -52,7 +52,7 @@ class EvidenceSpan(BaseModel):
         le=1.0,
         description="Contribution of this evidence to the final score"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -67,7 +67,7 @@ class EvidenceSpan(BaseModel):
 
 class DangerEvidence(BaseModel):
     """Evidence supporting all 4 danger scores"""
-    
+
     ambiguity_spans: List[EvidenceSpan] = Field(
         default_factory=list,
         description="Evidence for ambiguity danger"
@@ -95,7 +95,7 @@ from typing import Literal, Optional
 
 class DangerClassifierRequest(BaseModel):
     """Input to danger classifier"""
-    
+
     trace_id: str = Field(
         description="Which trace to classify"
     )
@@ -110,7 +110,7 @@ class DangerClassifierRequest(BaseModel):
         default=None,
         description="Previous scores for context (ignored in v1)"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -129,7 +129,7 @@ class DangerClassifierRequest(BaseModel):
 ```python
 class DangerScores(BaseModel):
     """All 4 danger scores + evidence"""
-    
+
     trace_id: str = Field(
         description="Trace being classified"
     )
@@ -153,11 +153,11 @@ class DangerScores(BaseModel):
         le=1.0,
         description="0=individual, 1=institutional"
     )
-    
+
     evidence: DangerEvidence = Field(
         description="Detailed evidence for each score"
     )
-    
+
     computed_at: datetime = Field(
         description="When scores were computed"
     )
@@ -171,7 +171,7 @@ class DangerScores(BaseModel):
         default=1.0,
         description="Overall confidence in scores (1.0 for rules, <1 for LLM)"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -197,7 +197,7 @@ from typing import Literal
 
 class GuardDecision(BaseModel):
     """Decision from a single guard"""
-    
+
     allowed: bool = Field(
         description="Is the transition allowed?"
     )
@@ -219,7 +219,7 @@ class GuardDecision(BaseModel):
         le=1.0,
         description="Supporting score (the danger value that triggered guard)"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -235,7 +235,7 @@ class GuardDecision(BaseModel):
 
 class TransitionGuardResponse(BaseModel):
     """Aggregated guard decisions for a transition"""
-    
+
     step_id: str = Field(
         description="Step being evaluated"
     )
@@ -246,11 +246,11 @@ class TransitionGuardResponse(BaseModel):
         default=None,
         description="Current FSM state"
     )
-    
+
     decisions: List[GuardDecision] = Field(
         description="All guard decisions that applied"
     )
-    
+
     allowed: bool = Field(
         description="Transition allowed? (True if all guards allow)"
     )
@@ -262,11 +262,11 @@ class TransitionGuardResponse(BaseModel):
         default_factory=list,
         description="If any guard escalated, list them"
     )
-    
+
     checked_at: datetime = Field(
         description="When guards were checked"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -299,7 +299,7 @@ from typing import List, Dict
 
 class ClassifierConfig(BaseModel):
     """Configuration for tuning classifier behavior"""
-    
+
     # Keyword lists (expandable)
     ambiguity_keywords: List[str] = Field(
         default_factory=lambda: [
@@ -325,7 +325,7 @@ class ClassifierConfig(BaseModel):
             "approval", "governance", "audit", "compliance", "legal"
         ]
     )
-    
+
     # Scoring thresholds
     block_threshold: float = Field(
         default=0.7,
@@ -345,7 +345,7 @@ class ClassifierConfig(BaseModel):
         le=1.0,
         description="Score ≥ this → escalate for governance"
     )
-    
+
     # Scoring weights
     problem_statement_weight: float = Field(
         default=2.0,
@@ -362,7 +362,7 @@ class ClassifierConfig(BaseModel):
         ge=0.0,
         description="Execution/decision text weighted 1.5x"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -385,7 +385,7 @@ from pydantic import field_validator, model_validator
 
 class DangerScores(BaseModel):
     # ... fields ...
-    
+
     @field_validator("danger_ambiguity", "danger_adversarial", 
                      "danger_irreversibility", "danger_institutional")
     @classmethod
@@ -394,7 +394,7 @@ class DangerScores(BaseModel):
         if not (0.0 <= v <= 1.0):
             raise ValueError(f"Danger score must be in [0.0, 1.0], got {v}")
         return v
-    
+
     @model_validator(mode="after")
     def evidence_not_empty(self):
         """Ensure at least one evidence span if score > 0"""
@@ -410,7 +410,7 @@ class DangerScores(BaseModel):
             self.danger_irreversibility +
             self.danger_institutional
         )
-        
+
         if total_score > 0.5 and total_spans == 0:
             raise ValueError(
                 f"Scores suggest danger, but no evidence spans provided"
@@ -425,13 +425,13 @@ class DangerScores(BaseModel):
 ```python
 if __name__ == "__main__":
     from json import dumps
-    
+
     schemas = {
         "DangerScores": DangerScores.model_json_schema(),
         "TransitionGuardResponse": TransitionGuardResponse.model_json_schema(),
         "ClassifierConfig": ClassifierConfig.model_json_schema(),
     }
-    
+
     for name, schema in schemas.items():
         with open(f"schemas/{name}.json", "w") as f:
             f.write(dumps(schema, indent=2))

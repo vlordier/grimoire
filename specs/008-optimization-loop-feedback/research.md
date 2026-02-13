@@ -10,7 +10,7 @@ After extracting and ranking patterns, how do we ensure they remain effective as
 
 ## Concept Drift Detection
 
-### What is Concept Drift?
+### What is Concept Drift
 
 **Definition**: Systematic change in the statistical properties of the target variable over time.
 

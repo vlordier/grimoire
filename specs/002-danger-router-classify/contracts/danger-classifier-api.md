@@ -13,6 +13,7 @@
 The Danger Classifier analyzes reasoning traces for 4 danger types (ambiguity, adversarial intent, irreversibility, institutional risk) and produces danger scores [0, 1] for each. Consumers (FSM, Guards, Retrieval) use these scores to block/warn/escalate decisions.
 
 **Integration**:
+
 - **Upstream (Phase 1)**: Receives `TraceBundle` + text to classify
 - **Downstream (Phase 2.3)**: Scores consumed by `GuardOrchestrator` + `FSMRouter`
 - **Storage**: Danger scores on Neo4j Step nodes + Qdrant step_windows payloads
@@ -23,7 +24,7 @@ The Danger Classifier analyzes reasoning traces for 4 danger types (ambiguity, a
 
 ### 1. Classify Single Trace
 
-```
+```text
 POST /v1/classify
 ```
 
@@ -101,7 +102,7 @@ curl -X POST http://localhost:8000/v1/classify \
 
 ### 2. Batch Classify Traces
 
-```
+```text
 POST /v1/classify/batch
 ```
 
@@ -150,7 +151,7 @@ curl -X POST http://localhost:8000/v1/classify/batch \
 
 ### 3. Get Classifier Config
 
-```
+```text
 GET /v1/config
 ```
 
@@ -198,7 +199,7 @@ curl http://localhost:8000/v1/config
 
 ### 4. Update Classifier Config
 
-```
+```text
 PUT /v1/config
 ```
 
@@ -233,7 +234,7 @@ curl -X PUT http://localhost:8000/v1/config \
 
 ### 5. Health Check
 
-```
+```text
 GET /v1/health
 ```
 
@@ -344,21 +345,21 @@ client.update_config(block_threshold=0.75)
 # In grimoire_ingestion.trace_processor
 def process_hf_record_with_danger(record: Dict) -> Trace:
     trace = normalize_to_trace(record)
-    
+
     # Call classifier
     danger_response = classifier_client.classify(
         trace_id=trace.trace_id,
         text_to_classify=trace.problem,
         context_role="goal"
     )
-    
+
     # Attach to trace
     trace.initial_danger = danger_response.danger_scores
-    
+
     # Store in Neo4j + Qdrant
     neo4j.create_trace_with_danger_scores(trace)
     qdrant.index_trace_with_danger_scores(trace)
-    
+
     return trace
 ```
 
@@ -378,7 +379,7 @@ def check_transition_guard(
             text_to_classify=step.text,
             context_role=step.role
         ).danger_scores
-    
+
     # Check guards (instantiation, irreversibility, etc.)
     if proposed_role == "execute":
         if step.danger_scores.danger_ambiguity >= 0.7:
@@ -388,7 +389,7 @@ def check_transition_guard(
                 guard_name="NO_EXECUTE_AMBIGUOUS",
                 reason="Ambiguity score 0.85; clarify problem first"
             )
-    
+
     return GuardDecision(allowed=True)
 ```
 
@@ -405,21 +406,21 @@ def rank_patterns_by_safety(
         trace_id=current_trace.trace_id,
         text_to_classify=current_trace.problem
     ).danger_scores
-    
+
     # Filter: don't recommend patterns that amplify danger
     safe_patterns = []
     for pattern in candidate_patterns:
         pattern_danger = getattr(pattern, "danger_scores", None)
-        
+
         if pattern_danger is None:
             continue  # Skip patterns without danger info
-        
+
         # Don't recommend adversarial patterns if current trace is already adversarial
         if current_danger.danger_adversarial > 0.5 and pattern_danger.danger_adversarial > 0.5:
             continue
-        
+
         safe_patterns.append(pattern)
-    
+
     return safe_patterns
 ```
 
@@ -493,6 +494,7 @@ def rank_patterns_by_safety(
 **Planned**: v2.0 (LLM-based scoring for higher accuracy)
 
 **Migration Path**:
+
 - v1.0 API stays same
 - v1.1 adds `classifier_version` to response
 - v2.0 changes `computing_ms` due to LLM latency (~500ms)
@@ -550,13 +552,13 @@ def test_execute_with_high_irreversibility_blocked():
             danger_irreversibility=0.95
         )
     )
-    
+
     guard = GuardOrchestrator()
     decision = guard.check_transition(
         step=step,
         proposed_role="execute"
     )
-    
+
     assert decision.allowed == False
     assert "irreversibility" in decision.reason.lower()
 ```
@@ -571,7 +573,7 @@ def test_batch_classify():
             for i in range(50)
         ]
     )
-    
+
     assert len(response.results) == 50
     assert response.total_ms < 500  # < 10ms per trace on average
 ```
@@ -581,17 +583,20 @@ def test_batch_classify():
 ## Implementation Notes
 
 **Classifier Backend**:
+
 - Keyword lists maintained in `config/classifier_config.yaml`
 - Regex compiled at startup for performance
 - Scores computed using weighted keyword matching + position boost
 - Empty input returns neutral scores [0, 0, 0, 0]
 
 **Storage Integration**:
+
 - Danger scores persisted on Step nodes in Neo4j
 - Also indexed in Qdrant payload (for vector-based retrieval)
 - Scores immutable after Step creation
 
 **Upgrade Path**:
+
 - v1.0: Rules-based (this implementation)
 - v2.0: LLM-based (Phase 2.1+, ~2 week effort)
   - Pluggable Scorer interface enables swap

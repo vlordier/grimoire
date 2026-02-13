@@ -36,13 +36,13 @@ class TextStorageClient:
 ```python
 def init_text_storage(storage_client: TextStorageClient):
     """Create bucket structure and lifecycle policies on startup"""
-    
+
     # S3 Example
     if storage_client.provider == "s3":
         try:
             # Create bucket directory structure (logical; S3 is flat)
             storage_client.client.head_bucket(Bucket=storage_client.bucket)
-            
+
             # Set lifecycle policy: keep versions for 30 days
             lifecycle_policy = {
                 "Rules": [
@@ -57,9 +57,9 @@ def init_text_storage(storage_client: TextStorageClient):
                 Bucket=storage_client.bucket,
                 LifecycleConfiguration=lifecycle_policy
             )
-            
+
             logger.info(f"Initialized S3 bucket {storage_client.bucket}")
-            
+
         except storage_client.client.exceptions.NoSuchBucket:
             raise ValueError(f"Bucket {storage_client.bucket} does not exist")
 ```
@@ -80,13 +80,13 @@ def store_initial_text(storage_client: TextStorageClient,
     Creates .md file + .meta.json audit metadata.
     Called by ingestion-api.md after Step creation.
     """
-    
+
     # Generate object key: steps/{trace_id}/{step_id}.md
     object_key = f"steps/{step_metadata['trace_id']}/{step_id}.md"
-    
+
     # Compute content hash for dedup
     content_hash = hashlib.sha256(text_content.encode()).hexdigest()
-    
+
     try:
         # Store markdown content
         storage_client.client.put_object(
@@ -101,7 +101,7 @@ def store_initial_text(storage_client: TextStorageClient,
                 "content_hash": content_hash
             }
         )
-        
+
         # Store audit metadata as separate .meta.json
         metadata = {
             "version_number": 1,
@@ -114,16 +114,16 @@ def store_initial_text(storage_client: TextStorageClient,
             "step_role": step_metadata["role"],
             "step_index": step_metadata["index"]
         }
-        
+
         storage_client.client.put_object(
             Bucket=storage_client.bucket,
             Key=f"{object_key}.meta.json",
             Body=json.dumps(metadata, indent=2),
             ContentType="application/json"
         )
-        
+
         logger.info(f"Stored text for step {step_id} (v1, {len(text_content)} bytes)")
-        
+
         return StoreResult(
             success=True,
             step_id=step_id,
@@ -132,7 +132,7 @@ def store_initial_text(storage_client: TextStorageClient,
             version=1,
             size_bytes=len(text_content)
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to store text for step {step_id}: {e}")
         return StoreResult(success=False, error=str(e))
@@ -152,10 +152,10 @@ def update_text_version(storage_client: TextStorageClient,
     Increments version, creates version history chain.
     Triggers embedding invalidation (via storage-api.md callback).
     """
-    
+
     object_key = f"steps/{trace_id}/{step_id}.md"
     new_content_hash = hashlib.sha256(new_text.encode()).hexdigest()
-    
+
     try:
         # 1. Retrieve current version metadata
         meta_response = storage_client.client.get_object(
@@ -165,7 +165,7 @@ def update_text_version(storage_client: TextStorageClient,
         current_meta = json.loads(meta_response["Body"].read())
         current_version = current_meta["version_number"]
         new_version = current_version + 1
-        
+
         # 2. Store new markdown (S3 automatically versions if versioning enabled)
         storage_client.client.put_object(
             Bucket=storage_client.bucket,
@@ -178,7 +178,7 @@ def update_text_version(storage_client: TextStorageClient,
                 "content_hash": new_content_hash
             }
         )
-        
+
         # 3. Update metadata with version increment
         new_meta = {
             "version_number": new_version,
@@ -191,20 +191,20 @@ def update_text_version(storage_client: TextStorageClient,
             "text_size_bytes": len(new_text),
             "diff_size_bytes": len(new_text) - current_meta.get("text_size_bytes", 0)
         }
-        
+
         storage_client.client.put_object(
             Bucket=storage_client.bucket,
             Key=f"{object_key}.meta.json",
             Body=json.dumps(new_meta, indent=2),
             ContentType="application/json"
         )
-        
+
         logger.info(f"Updated text for step {step_id} to v{new_version} (by {contributor_id})")
-        
+
         # 4. CALLBACK: Invalidate embedding in Qdrant + mark in Neo4j
         # (These coreographic calls could be async via message queue)
         storage_callback_invalidate_embedding(step_id, new_version)
-        
+
         return UpdateTextResult(
             success=True,
             step_id=step_id,
@@ -213,7 +213,7 @@ def update_text_version(storage_client: TextStorageClient,
             new_version=new_version,
             content_hash=new_content_hash
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to update text for step {step_id}: {e}")
         return UpdateTextResult(success=False, error=str(e))
@@ -230,25 +230,25 @@ def get_latest_text(storage_client: TextStorageClient,
                    step_id: str,
                    trace_id: str) -> GetTextResult:
     """Retrieve current version of step text"""
-    
+
     object_key = f"steps/{trace_id}/{step_id}.md"
-    
+
     try:
         response = storage_client.client.get_object(
             Bucket=storage_client.bucket,
             Key=object_key
         )
-        
+
         text_content = response["Body"].read().decode("utf-8")
         version = int(response["Metadata"].get("version", "1"))
-        
+
         # Also get metadata
         meta_response = storage_client.client.get_object(
             Bucket=storage_client.bucket,
             Key=f"{object_key}.meta.json"
         )
         metadata = json.loads(meta_response["Body"].read())
-        
+
         return GetTextResult(
             success=True,
             step_id=step_id,
@@ -258,7 +258,7 @@ def get_latest_text(storage_client: TextStorageClient,
             contributor_id=metadata["contributor_id"],
             timestamp=metadata["timestamp"]
         )
-        
+
     except storage_client.client.exceptions.NoSuchKey:
         logger.warning(f"Text not found for step {step_id}")
         return GetTextResult(success=False, error="Text not found")
@@ -278,11 +278,11 @@ def get_text_history(storage_client: TextStorageClient,
     Retrieve version history (all edits).
     Builds version chain by following previous_version links.
     """
-    
+
     object_key = f"steps/{trace_id}/{step_id}.md"
     history = []
     seen_hashes = set()
-    
+
     try:
         # Start with current version
         meta_response = storage_client.client.get_object(
@@ -290,7 +290,7 @@ def get_text_history(storage_client: TextStorageClient,
             Key=f"{object_key}.meta.json"
         )
         current_meta = json.loads(meta_response["Body"].read())
-        
+
         # Walk version chain backwards
         while len(history) < limit:
             entry = {
@@ -303,24 +303,24 @@ def get_text_history(storage_client: TextStorageClient,
             }
             history.append(entry)
             seen_hashes.add(current_meta["content_hash"])
-            
+
             # Try to fetch previous version metadata
             prev_version = current_meta.get("previous_version")
             if not prev_version:
                 break  # Reached initial version
-            
+
             # Older metadata stored separately versioned
             # For now, simplification: assume metadata available as-is
             # (Full implementation would use S3 versioning API)
             break
-        
+
         return HistoryResult(
             success=True,
             step_id=step_id,
             history=history,
             total_versions=len(history)
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to retrieve history for step {step_id}: {e}")
         return HistoryResult(success=False, error=str(e))
@@ -338,27 +338,27 @@ def compare_text_versions(storage_client: TextStorageClient,
     Generate diff between two versions of a step's text.
     Useful for multi-contributor reviews.
     """
-    
+
     object_key = f"steps/{trace_id}/{step_id}.md"
-    
+
     try:
         # Note: Real implementation would retrieve version_a from S3 versioning
         # For MVP: only compare current vs previous (stored in metadata)
-        
+
         # Get current version
         current = storage_client.client.get_object(
             Bucket=storage_client.bucket,
             Key=object_key
         )
         text_current = current["Body"].read().decode("utf-8")
-        
+
         # For simplicity, store previous version inline in metadata
         meta_response = storage_client.client.get_object(
             Bucket=storage_client.bucket,
             Key=f"{object_key}.meta.json"
         )
         metadata = json.loads(meta_response["Body"].read())
-        
+
         # Compute diff
         from difflib import unified_diff
         diff_lines = list(unified_diff(
@@ -368,7 +368,7 @@ def compare_text_versions(storage_client: TextStorageClient,
             tofile=f"v{version_b}",
             lineterm=""
         ))
-        
+
         return DiffResult(
             success=True,
             step_id=step_id,
@@ -378,7 +378,7 @@ def compare_text_versions(storage_client: TextStorageClient,
             additions=sum(1 for line in diff_lines if line.startswith("+")),
             deletions=sum(1 for line in diff_lines if line.startswith("-"))
         )
-        
+
     except Exception as e:
         logger.error(f"Diff failed for step {step_id}: {e}")
         return DiffResult(success=False, error=str(e))
@@ -399,31 +399,31 @@ def audit_text_changes(storage_client: TextStorageClient,
     Generate compliance report of all text changes in a trace.
     Shows who edited what, when, and what changed.
     """
-    
+
     prefix = f"steps/{trace_id}/"
     audit_entries = []
-    
+
     try:
         # List all steps in trace
         response = storage_client.client.list_objects_v2(
             Bucket=storage_client.bucket,
             Prefix=prefix
         )
-        
+
         for obj in response.get("Contents", []):
             key = obj["Key"]
             if not key.endswith(".meta.json"):
                 continue  # Skip markdown files; use metadata
-            
+
             step_id = key.split("/")[-1].replace(".md.meta.json", "")
-            
+
             # Retrieve metadata
             meta_response = storage_client.client.get_object(
                 Bucket=storage_client.bucket,
                 Key=key
             )
             metadata = json.loads(meta_response["Body"].read())
-            
+
             timestamp = datetime.fromisoformat(metadata["timestamp"])
             if start_date <= timestamp <= end_date:
                 audit_entries.append({
@@ -435,7 +435,7 @@ def audit_text_changes(storage_client: TextStorageClient,
                     "content_hash": metadata["content_hash"],
                     "size_bytes": metadata.get("text_size_bytes", 0)
                 })
-        
+
         return AuditReport(
             trace_id=trace_id,
             start_date=start_date,
@@ -444,7 +444,7 @@ def audit_text_changes(storage_client: TextStorageClient,
             total_changes=len(audit_entries),
             unique_contributors=len(set(e["contributor_id"] for e in audit_entries))
         )
-        
+
     except Exception as e:
         logger.error(f"Audit failed for trace {trace_id}: {e}")
         return AuditReport(error=str(e))
@@ -465,9 +465,9 @@ def soft_delete_text(storage_client: TextStorageClient,
     Mark text as deleted (e.g., PII removal) but preserve in archive.
     Updated metadata marks deletion timestamp and reason.
     """
-    
+
     object_key = f"steps/{trace_id}/{step_id}.md"
-    
+
     try:
         # Retrieve current metadata
         meta_response = storage_client.client.get_object(
@@ -475,12 +475,12 @@ def soft_delete_text(storage_client: TextStorageClient,
             Key=f"{object_key}.meta.json"
         )
         metadata = json.loads(meta_response["Body"].read())
-        
+
         # Add deletion marker
         metadata["deleted_at"] = datetime.now().isoformat()
         metadata["deletion_reason"] = reason
         metadata["is_deleted"] = True
-        
+
         # Update metadata only (don't overwrite content)
         storage_client.client.put_object(
             Bucket=storage_client.bucket,
@@ -488,11 +488,11 @@ def soft_delete_text(storage_client: TextStorageClient,
             Body=json.dumps(metadata, indent=2),
             ContentType="application/json"
         )
-        
+
         logger.info(f"Soft-deleted step text {step_id}: {reason}")
-        
+
         return DeleteResult(success=True, step_id=step_id)
-        
+
     except Exception as e:
         logger.error(f"Soft delete failed for step {step_id}: {e}")
         return DeleteResult(success=False, error=str(e))
@@ -508,54 +508,54 @@ def cleanup_old_versions(storage_client: TextStorageClient,
     Clean up old metadata versions beyond retention window.
     Markdown content preserved indefinitely (can be overwritten).
     """
-    
+
     cutoff_date = datetime.now() - timedelta(days=retention_days)
     deleted_count = 0
-    
+
     try:
         # List all metadata files
         response = storage_client.client.list_objects_v2(
             Bucket=storage_client.bucket,
             Prefix="steps/"
         )
-        
+
         for obj in response.get("Contents", []):
             if not obj["Key"].endswith(".meta.json"):
                 continue
-            
+
             meta_response = storage_client.client.get_object(
                 Bucket=storage_client.bucket,
                 Key=obj["Key"]
             )
             metadata = json.loads(meta_response["Body"].read())
-            
+
             old_meta = []
             # Filter old metadata entries
             if "version_history" in metadata:
                 old_meta = [v for v in metadata["version_history"]
                            if datetime.fromisoformat(v["timestamp"]) < cutoff_date]
-            
+
             if old_meta and not dry_run:
                 metadata["version_history"] = [
                     v for v in metadata.get("version_history", [])
                     if datetime.fromisoformat(v["timestamp"]) >= cutoff_date
                 ]
-                
+
                 storage_client.client.put_object(
                     Bucket=storage_client.bucket,
                     Key=obj["Key"],
                     Body=json.dumps(metadata, indent=2),
                     ContentType="application/json"
                 )
-                
+
                 deleted_count += len(old_meta)
-        
+
         return RetentionResult(
             success=True,
             deleted_entries=deleted_count,
             dry_run=dry_run
         )
-        
+
     except Exception as e:
         logger.error(f"Retention cleanup error: {e}")
         return RetentionResult(success=False, error=str(e))

@@ -24,7 +24,7 @@ This repository implements a multi-agent workflow system called **Speckit** that
 
 ### Directory Structure
 
-```
+```text
 .github/
 ├── agents/              # Agent behavior definitions (9 speckit agents)
 ├── prompts/             # Prompt templates for each agent
@@ -57,6 +57,7 @@ Each agent is triggered via CLI commands (or as subagents in the task tool) and 
 - **Setup scripts** (`.specify/scripts/bash/*.sh`) prepare environment and parse context
 
 Key scripts:
+
 - `setup-plan.sh`: Initializes feature directory and copies templates
 - `create-new-feature.sh`: Sets up a new feature branch with spec template
 - `update-agent-context.sh`: Updates agent context files after design phases
@@ -86,6 +87,7 @@ The numeric prefix determines the spec directory (e.g., branch `042-*` uses `spe
 ### JSON Output from Scripts
 
 Scripts support `--json` flag for structured output (used by agents to parse paths and metadata). Example: `setup-plan.sh --json` returns:
+
 ```json
 {
   "FEATURE_SPEC": "/path/to/spec.md",
@@ -107,6 +109,7 @@ Scripts support `--json` flag for structured output (used by agents to parse pat
 ```bash
 .specify/scripts/bash/create-new-feature.sh "My feature description"
 ```
+
 This creates a feature branch `###-feature-name` and initializes spec.md from template.
 
 ### Running the Planning Workflow
@@ -129,6 +132,7 @@ Read `specs/###-feature-name/tasks.md`, follow tasks in dependency order, update
 ### Checking Consistency Before Merge
 
 Run speckit.analyze to check:
+
 - spec.md → plan.md alignment
 - plan.md → tasks.md alignment
 - Constitution gates satisfaction
@@ -154,6 +158,7 @@ Run speckit.analyze to check:
 ### Pre-Merge Checklist
 
 Before creating a pull request:
+
 1. Run all linters and fix violations
 2. Run full test suite and verify all tests pass
 3. Run `speckit.analyze` on any modified specs/plans to check consistency

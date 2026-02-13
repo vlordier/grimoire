@@ -10,7 +10,7 @@
 
 **Phase 2** implements the **Control Plane** that ensures safe reasoning. 3 features work together:
 
-```
+```text
 Phase 2.1: Danger Classifier
 ├─ Scores 4 danger types: ambiguity, adversarial, irreversibility, institutional
 ├─ Produces: danger_scores on each Step
@@ -57,6 +57,7 @@ Created 15 new specification files across 3 feature branches:
 **What it does**: Classifies 4 danger types (ambiguity, adversarial, irreversibility, institutional) in reasoning traces.
 
 **Key specs**:
+
 - 8 user stories (P1: 5, P2: 3)
 - Pydantic v2 models with validators
 - Regex-based keyword detection (v1), LLM upgrade path (v2)
@@ -77,6 +78,7 @@ Created 15 new specification files across 3 feature branches:
 **What it does**: Selects 1 of 10 universal FSM types based on problem intent (debugging, design, optimization, etc.).
 
 **Key specs**:
+
 - 8 user stories (P1: 5, P2: 3)
 - 10 FSM types with keyword patterns
 - Pydantic v2 models with confidence scoring
@@ -98,6 +100,7 @@ Created 15 new specification files across 3 feature branches:
 **What it does**: Enforces 4 safety rules on FSM transitions using danger scores + FSM context.
 
 **Key specs**:
+
 - 6 user stories (P1: 4, P2: 2)
 - 4 guards: NO_EXECUTE_AMBIGUOUS, NO_IRREVERSIBLE_UNVERIFIED, ADVERSARIAL_REQUIRES_MONITORING, INSTITUTIONAL_REQUIRES_STAKEHOLDERS
 - Aggregated decision model (allowed: bool, reason: str, escalations: list)
@@ -115,7 +118,7 @@ Created 15 new specification files across 3 feature branches:
 
 ### Dependency Graph
 
-```
+```text
 Phase 1 (Complete) ✅
     ↓
     ├─→ Phase 2.1 (Danger Classifier) ← Independent
@@ -139,14 +142,17 @@ Phase 1 (Complete) ✅
 ### Implementation Paths
 
 **Path A: Sequential (Safe, Proven Approach)**
+
 1. Implement Phase 2.1 (Danger Classifier) — Days 1-11
 2. Implement Phase 2.2 (FSM Router) — Days 12-17
 3. Implement Phase 2.3 (Transition Guards) — Days 18-21
+
 - **Total**: 21 days (3 weeks)
 - **Risk**: Low (sequential means each stage fully tested before next)
 - **Benefit**: Clear integration points, easy to validate
 
 **Path B: Parallel (Aggressive, If Resources Available)**
+
 - Implement Phase 2.1 & 2.2 in parallel (Days 1-11, independent)
 - Then Phase 2.3 (Days 12-15, depends on both)
 - **Total**: 15 days (2 weeks)
@@ -174,9 +180,9 @@ Phase 1 (Complete) ✅
 | Task | Status |
 |------|--------|
 | Wait for Phase 2.1 & 2.2 complete | Days 8-11 (parallel dev) |
-| Phase 2.3 implementation | Days 12-14 | ✅ Spec ready |
-| E2E testing (all 3 features) | Days 14-15 | ✅ Integration tested |
-| Phase 2 validation | Days 15-17 | ✅ Success criteria verified |
+| Phase 2.3 implementation | Days 12-14 |
+| E2E testing (all 3 features) | Days 14-15 |
+| Phase 2 validation | Days 15-17 |
 
 **Final Deliverable**: End of Week 2 (Day 14-17) = Full Phase 2 Control Plane ready for Phase 3.
 

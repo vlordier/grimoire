@@ -7,11 +7,12 @@
 
 ## Clarification Questions
 
-### Q1: Should we use LLM or regex-only classifier for v1?
+### Q1: Should we use LLM or regex-only classifier for v1
 
 **Decision**: **Regex-only** (rules + keyword scoring)
 
 **Rationale**:
+
 - Reference implementation in [danger-classification-impl.md](../../docs/reference/danger-classification-impl.md) is fully rules-based
 - Deterministic: same input always produces same score (easier debugging)
 - Lower latency: < 500ms vs LLM calls (seconds)
@@ -22,14 +23,16 @@
 
 ---
 
-### Q2: What thresholds should we use for blocking vs warning vs escalating?
+### Q2: What thresholds should we use for blocking vs warning vs escalating
 
-**Decision**: 
+**Decision**:
+
 - **Block**: ≥ 0.7 (high confidence danger)
 - **Warn**: 0.5–0.7 (medium confidence, log but allow)
 - **Escalate**: ≥ 0.6 for institutional (requires sign-off)
 
 **Rationale**:
+
 - 0.7 is conservative enough to avoid false positives in critical paths (like execute)
 - 0.5–0.7 allows operation but logs for audit
 - Thresholds tunable via config (see plan.md)
@@ -37,7 +40,7 @@
 
 ---
 
-### Q3: How do we handle multi-danger scenarios?
+### Q3: How do we handle multi-danger scenarios
 
 **Example**: A problem is both ambiguous AND irreversible ("Delete this table faster")
 
@@ -51,18 +54,20 @@
 
 ---
 
-### Q4: Should guards live in Danger Classifier or separate Guard module?
+### Q4: Should guards live in Danger Classifier or separate Guard module
 
 **Decision**: **Separate Guard module** (orchestrates classifier input + FSM state)
 
 **Rationale**:
+
 - Classifier is pure: text → scores (no state dependencies)
 - Guards are stateful: need FSM state + trace history
 - Easier to test, debug, and extend separately
 - Aligns with Phase 2.3 feature (transition guards)
 
 **Architecture**:
-```
+
+```text
 Trace Input
   ↓
 [Classifier] → DangerScores
@@ -72,7 +77,7 @@ Trace Input
 
 ---
 
-### Q5: Where do danger scores live in the data model?
+### Q5: Where do danger scores live in the data model
 
 **Decision**: Attached to Steps, optional on Trace
 
@@ -82,17 +87,19 @@ Trace Input
 - Stored in Qdrant as payload fields (for filtering)
 
 **Rationale**:
+
 - Steps evolve, so danger may change through trace
 - Trace-level danger gives quick overview
 - Stored in both stores for fast retrieval (Neo4j for graph queries, Qdrant for vector filtering)
 
 ---
 
-### Q6: How do we handle language/multilingual issues?
+### Q6: How do we handle language/multilingual issues
 
 **Decision**: v1 **English-only**, with placeholders for future localization
 
 **Rationale**:
+
 - Reference implementation is English-based
 - MVP on HuggingFace datasets (mostly English)
 - Keyword expansion to other languages in Phase 3+
@@ -100,7 +107,7 @@ Trace Input
 
 ---
 
-### Q7: What happens if input is empty or malformed?
+### Q7: What happens if input is empty or malformed
 
 **Decision**: **Return neutral scores** (all scores = 0), log warning
 
@@ -116,32 +123,36 @@ def classify(trace: Trace) -> DangerScores:
         })
 ```
 
-**Rationale**: 
+**Rationale**:
+
 - No crash (robust)
 - Neutral is safe (won't block legitimate work)
 - Logged for investigation
 
 ---
 
-### Q8: Should guards block or just flag/escalate?
+### Q8: Should guards block or just flag/escalate
 
 **Decision**: **Mixed**:
+
 - AMBIGUITY guard: **BLOCK** EXECUTE (too risky)
 - IRREVERSIBILITY guard: **BLOCK** EXECUTE without verification (too risky)
 - ADVERSARIAL guard: **ESCALATE** (flag for human, allow to proceed if user confirms)
 - INSTITUTIONAL guard: **ESCALATE** (require stakeholder metadata, proceed after approval)
 
 **Rationale**:
+
 - Ambiguity + Irreversibility are operational risks → block
 - Adversarial + Institutional are governance risks → escalate (human-in-loop)
 
 ---
 
-### Q9: How do we know if the classifier is accurate?
+### Q9: How do we know if the classifier is accurate
 
 **Decision**: Evaluate on curated test set with human judgments
 
 **Method**:
+
 1. Create 20-30 manually-labeled traces (human rated each as high/low danger)
 2. Run classifier on them
 3. Compute precision, recall, F1
@@ -151,7 +162,7 @@ def classify(trace: Trace) -> DangerScores:
 
 ---
 
-### Q10: What's the upgrade path from v1 (rules) to v2 (LLM)?
+### Q10: What's the upgrade path from v1 (rules) to v2 (LLM)
 
 **Decision**: **Pluggable scorer interface**
 
@@ -165,6 +176,7 @@ class DangerScorer(Protocol):
 ```
 
 **Rationale**:
+
 - Same API, different implementations
 - Can A/B test v1 vs v2
 - No API breakage when upgrading

@@ -23,14 +23,14 @@ class IngestionRequest(BaseModel):
     Ingest a HuggingFace dataset and normalize to canonical schema.
     All fields directly correspond to canonical TraceBundle construction.
     """
-    
+
     # Dataset selection (required)
     dataset_id: str = Field(
         ...,
         description="HuggingFace dataset identifier (e.g., 'open-thoughts/OpenThoughts-114k')",
         examples=["open-thoughts/OpenThoughts-114k"]
     )
-    
+
     # Optional parameters
     dataset_split: Optional[str] = Field(
         default="train",
@@ -46,7 +46,7 @@ class IngestionRequest(BaseModel):
         le=10000,
         description="Records per batch during processing"
     )
-    
+
     # Embedding configuration (Phase 2)
     embedding_model_id: str = Field(
         default="sentence-transformers/all-MiniLM-L6-v2",
@@ -56,13 +56,13 @@ class IngestionRequest(BaseModel):
         default=None,
         description="Override model dimension; if provided, must be ≤ 8192"
     )
-    
+
     # Domain tagging (Phase 1)
     domain_default: str = Field(
         default="general",
         description="Default domain (general|software|ml|data|security|product|legal|health|finance)"
     )
-    
+
     # Dry-run mode
     dry_run: bool = Field(
         default=False,
@@ -88,7 +88,7 @@ class IngestionRequest(BaseModel):
 ```python
 class IngestionResponse(BaseModel):
     """Result of a successful ingestion batch"""
-    
+
     trace_ids: List[str] = Field(
         description="List of trace IDs successfully ingested"
     )
@@ -160,10 +160,10 @@ def load_hf_records(
     Yields one record at a time (memory-efficient).
     """
     ds = load_dataset(dataset_id, split=split, streaming=False)
-    
+
     if max_records:
         ds = ds.take(max_records)
-    
+
     for record in ds:
         yield record
 ```
@@ -193,7 +193,7 @@ def normalize_record_to_tracebundle(
 ) -> TraceBundle:
     """
     Transform a single HuggingFace record into a canonical TraceBundle.
-    
+
     Assumes record has structure:
     {
         "problem": str,
@@ -202,22 +202,22 @@ def normalize_record_to_tracebundle(
         "answer": str (optional)
     }
     """
-    
+
     # Extract fields
     problem_text = hf_record.get("problem", "")
     messages = hf_record.get("messages", [])
     thought_text = hf_record.get("thought_process", "")
     answer_text = hf_record.get("answer", "")
     record_id = hf_record.get("id")
-    
+
     # ---- Trace Creation ----
-    
+
     # Generate deterministic trace_id
     trace_id = generate_trace_id(problem_text, domain_default)
-    
+
     # Determine domain (use inference in Phase 2; for now, use default)
     domain = DomainTag(domain_default) if domain_default in DomainTag.__members__ else DomainTag.GENERAL
-    
+
     # Create Provenance
     provenance = Provenance(
         sources=[SourceRef(
@@ -236,7 +236,7 @@ def normalize_record_to_tracebundle(
         pipeline_version="0.1.0-alpha",
         schema_version="v1"
     )
-    
+
     # Create Trace
     trace = Trace(
         trace_id=trace_id,
@@ -249,11 +249,11 @@ def normalize_record_to_tracebundle(
         n_steps=len(messages) + (2 if thought_text else 1),
         created_at=datetime.now()
     )
-    
+
     # ---- Steps Creation ----
-    
+
     steps = []
-    
+
     # Step 0: Initial problem (GOAL)
     initial_step = Step(
         step_id=generate_ulid(),
@@ -265,7 +265,7 @@ def normalize_record_to_tracebundle(
         created_at=datetime.now()
     )
     steps.append(initial_step)
-    
+
     # Steps 1..N: Message exchanges
     for i, msg in enumerate(messages, start=1):
         role_map = {
@@ -273,7 +273,7 @@ def normalize_record_to_tracebundle(
             "assistant": StepRole.OBSERVATION,
             "system": StepRole.OBSERVATION
         }
-        
+
         step = Step(
             step_id=generate_ulid(),
             trace_id=trace.trace_id,
@@ -284,7 +284,7 @@ def normalize_record_to_tracebundle(
             created_at=datetime.now()
         )
         steps.append(step)
-    
+
     # Optional: Thought process as CRITIQUE step
     if thought_text:
         critique_step = Step(
@@ -297,9 +297,9 @@ def normalize_record_to_tracebundle(
             created_at=datetime.now()
         )
         steps.append(critique_step)
-    
+
     # ---- Edges Creation ----
-    
+
     edges = []
     for i in range(len(steps) - 1):
         edge = Edge(
@@ -311,9 +311,9 @@ def normalize_record_to_tracebundle(
             weight=1.0
         )
         edges.append(edge)
-    
+
     # ---- TraceBundle Assembly ----
-    
+
     bundle = TraceBundle(
         trace=trace,
         steps=steps,
@@ -322,7 +322,7 @@ def normalize_record_to_tracebundle(
         patterns=[],
         pattern_instances=[]
     )
-    
+
     return bundle
 ```
 
@@ -335,17 +335,17 @@ def validate_tracebundle(bundle: TraceBundle) -> Tuple[bool, List[str]]:
     Return (is_valid, list_of_errors).
     """
     errors = []
-    
+
     # Check all steps reference correct trace_id
     for step in bundle.steps:
         if step.trace_id != bundle.trace.trace_id:
             errors.append(f"Step {step.step_id} has mismatched trace_id")
-    
+
     # Check all edges reference correct trace_id and valid nodes
     step_ids = {s.step_id for s in bundle.steps}
     artifact_ids = {a.artifact_id for a in bundle.artifacts}
     valid_node_ids = step_ids | artifact_ids
-    
+
     for edge in bundle.edges:
         if edge.trace_id != bundle.trace.trace_id:
             errors.append(f"Edge {edge.edge_id} has mismatched trace_id")
@@ -353,15 +353,15 @@ def validate_tracebundle(bundle: TraceBundle) -> Tuple[bool, List[str]]:
             errors.append(f"Edge {edge.edge_id}: source node {edge.src.id} not found")
         if edge.dst.id not in valid_node_ids:
             errors.append(f"Edge {edge.edge_id}: destination node {edge.dst.id} not found")
-    
+
     # Check trace has at least one step
     if len(bundle.steps) == 0:
         errors.append(f"Trace {bundle.trace.trace_id} has no steps")
-    
+
     # Check no duplicate step_ids
     if len(step_ids) != len(bundle.steps):
         errors.append("Duplicate step_ids in bundle")
-    
+
     return len(errors) == 0, errors
 
 
@@ -386,17 +386,17 @@ def persist_bundle(
     Neo4j: structure (nodes, edges)
     Qdrant: embeddings + searchable payload
     """
-    
+
     # 1. Store to Neo4j
     try:
         store_tracebundle_neo4j(neo4j_session, bundle)
     except Exception as e:
         logger.error(f"Neo4j storage failed for trace {bundle.trace.trace_id}: {e}")
         return IngestionResult(success=False, error=str(e))
-    
+
     # 2. Generate embeddings for steps (Phase 2: optional)
     # (For now, skip; store structure only)
-    
+
     return IngestionResult(
         success=True,
         trace_id=bundle.trace.trace_id,
@@ -453,14 +453,14 @@ def encode_base58(data: bytes) -> str:
 async def ingest_dataset_batch(req: IngestionRequest) -> IngestionResponse:
     """
     Main entry point: ingest a dataset batch.
-    
+
     Flow:
     1. Validate request
     2. Load HuggingFace dataset
     3. For each record: normalize → validate → persist
     4. Return aggregated response
     """
-    
+
     # Validate
     is_valid, error = validate_ingestion_request(req)
     if not is_valid:
@@ -473,17 +473,17 @@ async def ingest_dataset_batch(req: IngestionRequest) -> IngestionResponse:
             duration_seconds=0,
             status="failed"
         )
-    
+
     start_time = datetime.now()
     trace_ids = []
     total_steps = 0
     total_edges = 0
     errors = []
-    
+
     # Neo4j + Qdrant connections
     neo4j_session = neo4j_driver.session()
     qdrant_cli = QdrantClient(url="http://localhost:6333")
-    
+
     try:
         # Stream records from HuggingFace
         for record in load_hf_records(
@@ -499,14 +499,14 @@ async def ingest_dataset_batch(req: IngestionRequest) -> IngestionResponse:
                     split=req.dataset_split or "train",
                     domain_default=req.domain_default
                 )
-                
+
                 # Validate
                 is_valid, bundle_errors = validate_tracebundle(bundle)
                 if not is_valid:
                     for err in bundle_errors:
                         errors.append(f"Trace {bundle.trace.trace_id}: {err}")
                     continue
-                
+
                 # Persist
                 if not req.dry_run:
                     result = persist_bundle(
@@ -527,13 +527,13 @@ async def ingest_dataset_batch(req: IngestionRequest) -> IngestionResponse:
                     total_steps += len(bundle.steps)
                     total_edges += len(bundle.edges)
                     logger.info(f"[DRY RUN] Would ingest {bundle.trace.trace_id}")
-                
+
             except Exception as e:
                 logger.exception(f"Failed to process record: {e}")
                 errors.append(str(e))
-        
+
         duration = (datetime.now() - start_time).total_seconds()
-        
+
         return IngestionResponse(
             trace_ids=trace_ids,
             n_traces=len(trace_ids),
@@ -543,7 +543,7 @@ async def ingest_dataset_batch(req: IngestionRequest) -> IngestionResponse:
             duration_seconds=duration,
             status="success" if len(errors) == 0 else ("partial" if trace_ids else "failed")
         )
-    
+
     finally:
         neo4j_session.close()
 ```

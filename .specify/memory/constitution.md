@@ -45,6 +45,7 @@ that encode mid-level reasoning strategies. The core loop is:
 **problem → lookup recipe → execute with verification → learn → improve**
 
 Non-negotiable rules:
+
 - Recipes MUST be self-contained and independently testable.
 - Recipes MUST include: what to check first, what variables to
   define, what strategy to use, common mistakes to avoid, and when
@@ -64,6 +65,7 @@ Results MUST be verified before they feed back into the system.
 Learning from unverified outputs is the worst failure mode.
 
 Non-negotiable rules:
+
 - Before declaring success, the system MUST check correctness via
   tests, mathematical substitution, output validation, or equivalent
   evidence.
@@ -84,6 +86,7 @@ Improvements are NOT shared immediately. Proposed recipe improvements
 MUST pass quality gates before entering shared memory.
 
 Non-negotiable rules:
+
 - All proposed improvements MUST go through a filtering pipeline:
   noise filtering → testing on challenge cases → verification →
   promotion.
@@ -103,6 +106,7 @@ The system MUST bias toward reusing proven recipes. Exploration
 (trying novel approaches) is permitted only when exploitation fails.
 
 Non-negotiable rules:
+
 - For every new problem, the system MUST first attempt the
   highest-confidence matching recipe.
 - Exploration MUST be triggered only by verified failure of existing
@@ -121,6 +125,7 @@ All production code MUST follow Test-Driven Development. The project
 MUST be strongly linted and well-tested at all times.
 
 Non-negotiable rules:
+
 - TDD cycle: write tests → confirm tests fail → implement → confirm
   tests pass → refactor. This order is mandatory.
 - All source code MUST pass configured linting checks before merge.
@@ -142,6 +147,7 @@ All data MUST conform to the canonical Pydantic schema. No subsystem
 may define its own incompatible data model.
 
 Non-negotiable rules:
+
 - The canonical schema (Trace, Step, Artifact, Edge, Pattern) is the
   single contract across ingestion, storage, retrieval, and
   evaluation.
@@ -163,6 +169,7 @@ Structure and semantics MUST be stored separately: graph database for
 relationships, vector database for retrieval.
 
 Non-negotiable rules:
+
 - Neo4j (or compatible graph DB) stores: Steps, Edges, Artifacts,
   Patterns, and all relationships.
 - Qdrant (or compatible vector DB) stores: embeddings for Steps,
@@ -183,6 +190,7 @@ information. Unlicensed or improperly attributed data MUST NOT enter
 the system.
 
 Non-negotiable rules:
+
 - Every Trace MUST record: source type, source ID, license,
   sensitivity level, ingestion timestamp, pipeline version.
 - Datasets with incompatible licenses (e.g., proprietary, no
@@ -202,6 +210,7 @@ All traces MUST be screened for PII and unsafe content. Sensitive
 data MUST NOT leak into shared memory.
 
 Non-negotiable rules:
+
 - PII detection MUST run on all ingested text before storage.
 - Detected PII MUST be scrubbed or the trace rejected (depending on
   sensitivity policy).
@@ -222,6 +231,7 @@ The system MUST measure its own performance and prune low-quality
 patterns. Evaluation is not optional.
 
 Non-negotiable rules:
+
 - A benchmark suite (minimum 200 prompts spanning archetypes) MUST
   exist for routing and pattern quality evaluation.
 - Pattern quality metrics MUST include: support count, success proxy,
@@ -309,6 +319,7 @@ project. It supersedes all other practices, conventions, and ad-hoc
 decisions.
 
 **Amendment Procedure**:
+
 1. Propose amendment via `speckit.constitution` with rationale.
 2. Run `speckit.analyze` to verify impact on existing specs/plans.
 3. Version bump follows semantic versioning (see below).
@@ -316,12 +327,14 @@ decisions.
    principles within one release cycle.
 
 **Versioning Policy**:
+
 - MAJOR: Backward-incompatible principle removals or redefinitions.
 - MINOR: New principle or section added, or material expansion of
   existing guidance.
 - PATCH: Clarifications, wording fixes, non-semantic refinements.
 
 **Compliance Review**:
+
 - Every PR review MUST include a constitution compliance check.
 - `speckit.analyze` validates spec/plan alignment with this document.
 - Violations MUST be resolved before merge; no exceptions.

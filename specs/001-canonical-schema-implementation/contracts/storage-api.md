@@ -28,10 +28,10 @@ class Neo4jConnection:
         """
         self.driver = GraphDatabase.driver(uri, auth=auth)
         self.database = database
-    
+
     def close(self):
         self.driver.close()
-    
+
     def health_check(self) -> bool:
         """Verify Neo4j server is reachable"""
         try:
@@ -101,19 +101,19 @@ def init_schema(neo4j_conn: Neo4jConnection) -> Tuple[bool, Optional[str]]:
         # Trace
         "CREATE CONSTRAINT trace_id_unique IF NOT EXISTS FOR (t:Trace) REQUIRE t.trace_id IS UNIQUE",
         "CREATE CONSTRAINT trace_domain_required IF NOT EXISTS FOR (t:Trace) REQUIRE t.domain IS NOT NULL",
-        
+
         # Step
         "CREATE CONSTRAINT step_id_unique IF NOT EXISTS FOR (s:Step) REQUIRE s.step_id IS UNIQUE",
         "CREATE CONSTRAINT step_trace_required IF NOT EXISTS FOR (s:Step) REQUIRE s.trace_id IS NOT NULL",
         "CREATE CONSTRAINT step_index_required IF NOT EXISTS FOR (s:Step) REQUIRE s.index IS NOT NULL",
-        
+
         # Artifact
         "CREATE CONSTRAINT artifact_id_unique IF NOT EXISTS FOR (a:Artifact) REQUIRE a.artifact_id IS UNIQUE",
-        
+
         # Pattern
         "CREATE CONSTRAINT pattern_id_unique IF NOT EXISTS FOR (p:Pattern) REQUIRE p.pattern_id IS UNIQUE",
     ]
-    
+
     indexes = [
         "CREATE INDEX trace_domain_idx IF NOT EXISTS FOR (t:Trace) ON (t.domain)",
         "CREATE INDEX trace_created_at_idx IF NOT EXISTS FOR (t:Trace) ON (t.created_at)",
@@ -123,20 +123,20 @@ def init_schema(neo4j_conn: Neo4jConnection) -> Tuple[bool, Optional[str]]:
         "CREATE INDEX artifact_type_idx IF NOT EXISTS FOR (a:Artifact) ON (a.type)",
         "CREATE INDEX pattern_type_idx IF NOT EXISTS FOR (p:Pattern) ON (p.type)",
     ]
-    
+
     try:
         with neo4j_conn.driver.session(database=neo4j_conn.database) as session:
             for constraint in constraints:
                 session.run(constraint)
                 logger.debug(f"Applied constraint: {constraint[:60]}...")
-            
+
             for index in indexes:
                 session.run(index)
                 logger.debug(f"Applied index: {index[:60]}...")
-        
+
         logger.info("Neo4j schema initialization complete")
         return True, None
-    
+
     except Exception as e:
         logger.error(f"Schema initialization failed: {e}")
         return False, str(e)
@@ -159,17 +159,17 @@ def store_tracebundle(
     """
     Atomically persist TraceBundle to Neo4j.
     Single transaction: if any part fails, entire operation rolls back.
-    
+
     Returns (success, error_message).
     """
-    
+
     trace_id = bundle.trace.trace_id
-    
+
     try:
         with neo4j_conn.driver.session(database=neo4j_conn.database) as session:
             # Begin transaction
             tx = session.begin_transaction()
-            
+
             try:
                 # 1. Create Trace node
                 tx.run("""
@@ -180,7 +180,7 @@ def store_tracebundle(
                         problem: $problem,
                         tags: $tags,
                         n_steps: $n_steps,
-                        
+
                         provenance_source_types: $source_types,
                         provenance_source_ids: $source_ids,
                         provenance_license: $license,
@@ -188,7 +188,7 @@ def store_tracebundle(
                         ingested_at: $ingested_at,
                         pipeline_version: $pipeline_version,
                         schema_version: $schema_version,
-                        
+
                         created_at: $created_at,
                         updated_at: $updated_at
                     })
@@ -199,7 +199,7 @@ def store_tracebundle(
                     "problem": bundle.trace.problem or "",
                     "tags": bundle.trace.tags,
                     "n_steps": bundle.trace.n_steps or len(bundle.steps),
-                    
+
                     "source_types": [s.source_type.value for s in bundle.trace.provenance.sources],
                     "source_ids": [s.source_id for s in bundle.trace.provenance.sources if s.source_id],
                     "license": bundle.trace.provenance.license_info.license.value if bundle.trace.provenance.license_info else "unknown",
@@ -207,13 +207,13 @@ def store_tracebundle(
                     "ingested_at": bundle.trace.provenance.ingested_at.isoformat() if bundle.trace.provenance.ingested_at else None,
                     "pipeline_version": bundle.trace.provenance.pipeline_version,
                     "schema_version": bundle.trace.provenance.schema_version,
-                    
+
                     "created_at": bundle.trace.created_at.isoformat() if bundle.trace.created_at else datetime.now().isoformat(),
                     "updated_at": bundle.trace.updated_at.isoformat() if bundle.trace.updated_at else None
                 })
-                
+
                 logger.debug(f"Created Trace {trace_id}")
-                
+
                 # 2. Create Step nodes
                 for step in bundle.steps:
                     tx.run("""
@@ -241,9 +241,9 @@ def store_tracebundle(
                         "fsm_state": step.fsm_state.value if step.fsm_state else None,
                         "created_at": step.created_at.isoformat() if step.created_at else datetime.now().isoformat()
                     })
-                
+
                 logger.debug(f"Created {len(bundle.steps)} steps")
-                
+
                 # 3. Create Artifact nodes
                 for artifact in bundle.artifacts:
                     tx.run("""
@@ -264,15 +264,15 @@ def store_tracebundle(
                         "domain": artifact.domain.value if artifact.domain else "general",
                         "priority": artifact.priority
                     })
-                
+
                 logger.debug(f"Created {len(bundle.artifacts)} artifacts")
-                
+
                 # 4. Create relationship edges
                 for edge in bundle.edges:
                     # Determine source/dest nodes
                     src_label = "Step" if edge.src.type.value == "step" else "Artifact"
                     dst_label = "Step" if edge.dst.type.value == "step" else "Artifact"
-                    
+
                     tx.run(f"""
                         MATCH (src:{src_label} {{{src_label.lower()}_id: $src_id}})
                         MATCH (dst:{dst_label} {{{dst_label.lower()}_id: $dst_id}})
@@ -288,19 +288,19 @@ def store_tracebundle(
                         "weight": edge.weight or 1.0,
                         "label": edge.label or None
                     })
-                
+
                 logger.debug(f"Created {len(bundle.edges)} edges")
-                
+
                 # Commit
                 tx.commit()
                 logger.info(f"Successfully stored TraceBundle {trace_id}")
                 return True, None
-            
+
             except Exception as e:
                 tx.rollback()
                 logger.error(f"Transaction failed for {trace_id}: {e}", exc_info=True)
                 return False, str(e)
-    
+
     except Exception as e:
         logger.error(f"Session error for {trace_id}: {e}", exc_info=True)
         return False, str(e)
@@ -362,10 +362,10 @@ def store_tracebundles_batch(
     Store multiple bundles (e.g., from ingestion batch).
     Returns (successful_count, failed_count).
     """
-    
+
     success_count = 0
     failure_count = 0
-    
+
     for i, bundle in enumerate(bundles):
         success, error = store_tracebundle(neo4j_conn, bundle)
         if success:
@@ -373,7 +373,7 @@ def store_tracebundles_batch(
         else:
             failure_count += 1
             logger.warning(f"Failed to store bundle {i}: {error}")
-    
+
     logger.info(f"Batch result: {success_count} successful, {failure_count} failed")
     return success_count, failure_count
 ```
@@ -390,7 +390,7 @@ def soft_delete_trace(
     trace_id: str
 ) -> bool:
     """Mark a trace as deleted (set deleted_at timestamp)"""
-    
+
     try:
         with neo4j_conn.driver.session(database=neo4j_conn.database) as session:
             result = session.run("""
@@ -401,9 +401,9 @@ def soft_delete_trace(
                 "trace_id": trace_id,
                 "deleted_at": datetime.now().isoformat()
             })
-            
+
             return result.single() is not None
-    
+
     except Exception as e:
         logger.error(f"Soft delete failed for {trace_id}: {e}")
         return False
@@ -414,13 +414,13 @@ def soft_delete_trace(
 ```python
 def rebuild_indexes(neo4j_conn: Neo4jConnection) -> bool:
     """Rebuild all indexes for optimization (requires ADMIN privilege)"""
-    
+
     try:
         with neo4j_conn.driver.session(database=neo4j_conn.database) as session:
             session.run("CALL db.indexes.fulltext.await()")
             logger.info("Indexes rebuilt successfully")
             return True
-    
+
     except Exception as e:
         logger.error(f"Index rebuild failed: {e}")
         return False

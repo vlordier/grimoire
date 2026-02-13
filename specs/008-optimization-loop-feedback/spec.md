@@ -1,16 +1,19 @@
 # Feature 007-Optimization-Loop: Feedback-Driven Pattern Improvement
 
 ## Feature Overview
+
 Build a feedback loop system that tracks pattern effectiveness, detects concept drift, and triggers pattern re-ranking and optimization for continuous system improvement.
 
 ## User Stories
 
 ### P1: Feedback Collection
+
 **As a** reasoning system  
 **I want to** collect execution feedback (success, quality, latency, cost) for each pattern  
 **So that** patterns can be scored based on real-world performance
 
 **Acceptance Criteria**:
+
 - Collect feedback events: success (bool), outcome_quality (0-10), user_satisfaction (0-5), latency_ms, memory_mb, error_code
 - Async collection (non-blocking, buffered)
 - Feedback tagged with: pattern_id, trace_id, timestamp, user_context (domain, fsm_type)
@@ -18,11 +21,13 @@ Build a feedback loop system that tracks pattern effectiveness, detects concept 
 - Retention: 90-day sliding window
 
 ### P1: Concept Drift Detection
+
 **As a** system monitor  
 **I want to** detect when pattern effectiveness is declining (concept drift)  
 **So that** patterns are re-ranked and optimized automatically
 
 **Acceptance Criteria**:
+
 - Calculate rolling average: effectiveness(last 30 days) vs. effectiveness(30-60 days ago)
 - Threshold: >15% drop in either metric triggers drift alert
 - Metrics: success_rate, outcome_quality, cost (latency + memory)
@@ -30,11 +35,13 @@ Build a feedback loop system that tracks pattern effectiveness, detects concept 
 - Pattern flagged for review if drifted
 
 ### P1: Re-Ranking Triggers
+
 **As a** optimization engine  
 **I want to** re-rank patterns when new feedback arrives or drift detected  
 **So that** pattern rankings always reflect recent performance
 
 **Acceptance Criteria**:
+
 - Trigger 1: Every K=50 feedback events (batch re-ranking)
 - Trigger 2: Concept drift detected (immediate re-rank top-N patterns)
 - Trigger 3: Manual trigger via API endpoint
@@ -42,11 +49,13 @@ Build a feedback loop system that tracks pattern effectiveness, detects concept 
 - Keep re-ranking history (timestamp, reason, pattern_scores_before, after)
 
 ### P1: A/B Testing Framework
+
 **As a** pattern optimizer  
 **I want to** run A/B tests comparing old vs. new pattern versions  
 **So that** only improvements are promoted to production
 
 **Acceptance Criteria**:
+
 - Create experiment: pattern_id, version_a, version_b, sample_size, duration
 - Route percentage of traffic to version_a/version_b (configurable split)
 - Collect separate feedback streams per version
@@ -55,11 +64,13 @@ Build a feedback loop system that tracks pattern effectiveness, detects concept 
 - Audit trail: experiment results logged
 
 ### P2: Pattern Lifecycle Management
+
 **As a** knowledge engineer  
 **I want to** track pattern versions and retirement (deprecate low-score patterns)  
 **So that** system only uses high-quality patterns
 
 **Acceptance Criteria**:
+
 - Pattern versioning: pattern_id + version_number
 - Effectiveness TTL: patterns with score <0.3 for 60+ days auto-deprecated
 - Deprecation reasons: concept_drift, superseded, manual_review

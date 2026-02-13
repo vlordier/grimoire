@@ -13,7 +13,8 @@ Build foundational data ingestion pipeline that normalizes reasoning traces from
 
 **Language/Version**: Python 3.11+ (per Constitution Principle V TDD requirement)
 
-**Primary Dependencies**: 
+**Primary Dependencies**:
+
 - `datasets >= 2.14.0` (HuggingFace ingestion)
 - `pydantic >= 2.0` (canonical schema, per Principle VI, NON-NEGOTIABLE)
 - `neo4j-driver >= 5.0` (graph storage)
@@ -24,7 +25,8 @@ Build foundational data ingestion pipeline that normalizes reasoning traces from
 - `pytest >= 7.4.0`, `pytest-cov` (test harness)
 - `ruff`, `mypy` (linting/type-checking, per Principle V)
 
-**Storage**: 
+**Storage**:
+
 - **Neo4j 5.x**: Graph structure (Traces, Steps, Edges, Provenance metadata)
 - **Qdrant ≥ 1.7**: Vectors (step embeddings, window embeddings) with version binding and filterable payloads
 - **AWS S3 / GCS**: Markdown text versions with audit trail (version_number, content_hash, contributor_id, timestamp, change_note)
@@ -36,23 +38,26 @@ Build foundational data ingestion pipeline that normalizes reasoning traces from
 **Project Type**: Single Python project (ingestion service as CLI and library)
 
 **Performance Goals**:
+
 - Ingestion throughput ≥ 200 traces/minute on single instance (SC-001: 1K traces < 5 min)
 - Neo4j single-trace retrieval < 50ms (SC-003)
 - Qdrant top-10 search < 100ms excluding embedding (SC-004)
 
-**Constraints**: 
+**Constraints**:
+
 - Storage efficiency: Neo4j nodes < 2KB avg (SC-007), Qdrant payloads < 1KB avg
 - Zero data loss on transient failures per-batch (SC-005)
 - Schema versioning explicit; migrations tested before deployment
 
-**Scale/Scope**: 
+**Scale/Scope**:
+
 - Phase 1: 114K traces (OpenThoughts-114k, MVP validation)
 - Phase 1+: 1.2M traces (OpenThoughts3-1.2M, performance benchmark)
 - Full text externalized to S3/GCS; Neo4j stores pointers only (lean graph)
 
 ---
 
-## Constitution Check  
+## Constitution Check
 
 **Status**: ✅ **FULL PASS** — All 10 principles addressed; no violations
 
@@ -70,11 +75,12 @@ Build foundational data ingestion pipeline that normalizes reasoning traces from
 | **X. Continuous Eval** | ✅ | Dedup+versioning FR-002b; benchmark on 114K+1.2M; 8 success criteria (SC-001-SC-008) |
 
 **Technical Stack**:
+
 - ✅ Python 3.11+
 - ✅ Pydantic >= 2 (canonical schema)
 - ✅ Neo4j (graph storage)
 - ✅ Qdrant (vector storage)
-- ✅ ULID for IDs (composite: base58(SHA256)[:12] + ULID_suffix[:8], per clarification Q3)
+- ✅ ULID for IDs (composite: base58[:12](SHA256) + ULID_suffix[:8], per clarification Q3)
 - ✅ FSM-aware windows (adaptive depth per FSM, FR-015)
 - ✅ Danger signal filters (Qdrant payload, FR-016)
 
@@ -86,7 +92,7 @@ Build foundational data ingestion pipeline that normalizes reasoning traces from
 
 ### Documentation (this feature)
 
-```
+```text
 specs/001-canonical-schema-implementation/
 ├── spec.md                          # ✅ Specification completed
 ├── plan.md                          # This file (Phase 0→1 output)
@@ -103,7 +109,7 @@ specs/001-canonical-schema-implementation/
 
 ### Source Code
 
-```
+```text
 src/
 ├── schema/
 │   ├── canonical.py               # Pydantic v2 models: Trace, Step, Edge, Provenance, EmbeddingRef, StepTextVersion
@@ -156,12 +162,14 @@ pyproject.toml                     # Poetry/setuptools config, pytest, linting (
 **Question**: Which embedding model balances performance, cost, and latency for MVP?
 
 **Decision** (from clarification Q2): **all-MiniLM-L6-v2** (384 dims) as default for development.
+
 - Local execution (no API calls, no rate limits)
 - Deterministic outputs (reproducible dedup hashing)
 - Fast inference (~100ms for 500 tokens on CPU)
 - Sufficient semantic quality for initial pattern retrieval
 
 **Migration Path**: Configurable via `embedding_model_id` runtime parameter to support:
+
 - `text-embedding-3-large` (OpenAI, 3072 dims, best quality, cost trade-off)
 - `BAAI/bge-large-en-v1.5` (open-source, 1024 dims, strong performance)
 - Custom HuggingFace model ID at deployment time
@@ -173,10 +181,12 @@ pyproject.toml                     # Poetry/setuptools config, pytest, linting (
 **Question**: How should 114K and 1.2M datasets differ in pipeline setup?
 
 **Decision** (from clarification Q1): Use both iteratively.
+
 - **114K (MVP)**: Fast iteration, schema validation, baseline performance measurement
 - **1.2M (Scale)**: Performance benchmark, dedup validation at scale, provenance tracking at volume
 
 **Shared Schema**: Both datasets ingested with identical canonical schema (no variants). Differences:
+
 - Ingestion time targets: 114K < 15min, 1.2M < 5min (per SC-001: ≥200 traces/min)
 - Window size validation: FSM-adaptive windows tested on both distributions
 - Dedup effectiveness: Measure collision rate, false positive, false negative across scales
@@ -188,8 +198,10 @@ pyproject.toml                     # Poetry/setuptools config, pytest, linting (
 **Question**: How to externalize step text while maintaining audit trail?
 
 **Decision** (from clarification Q4): S3/GCS markdown with version control metadata.
+
 - **Bucket structure**: `s3://grimoire-text-store/trace-{trace_id}/step-{step_id}/v{version_number}.md`
 - **Version metadata**: Stored alongside as JSON (`v{version}.meta.json`):
+
   ```json
   {
     "version_number": 1,
@@ -199,6 +211,7 @@ pyproject.toml                     # Poetry/setuptools config, pytest, linting (
     "change_note": "Initial ingestion from OpenThoughts-114k"
   }
   ```
+
 - **Consistency**: Neo4j stores `step.text_key = "s3://grimoire-text-store/trace-{id}/step-{id}/v1"` and `step.text_hash` for validation
 - **Embedding Binding**: Qdrant embedding payload includes `text_version_bound: 1`; on text update, flag embedding as stale
 
@@ -213,6 +226,7 @@ pyproject.toml                     # Poetry/setuptools config, pytest, linting (
 **Core Entities**:
 
 #### Trace
+
 ```python
 class Trace(BaseModel):
     trace_id: str                           # Composite: base58(SHA256(problem+domain+tags))[:12] + "-" + ULID[:8]
@@ -224,10 +238,10 @@ class Trace(BaseModel):
     updated_at: datetime
     status: str = "ingested"                # ingested, validated, processed, failed
     trace_version: int = 1                  # Integer version; increments when same problem re-solved
-    
+
     n_steps: int                            # Step count for quick access
     outcome: Optional[Dict[str, Any]] = None  # Result summary (JSON serializable)
-    
+
     # Provenance (flattened from Provenance model)
     provenance_sources: List[SourceRef]
     provenance_license: LicenseType
@@ -237,13 +251,13 @@ class Trace(BaseModel):
     provenance_ingested_at: datetime
     provenance_pipeline_version: str        # e.g., "0.1.0-alpha"
     provenance_schema_version: str = "v1"   # Increments on breaking changes
-    
+
     # Danger scores (optional, computed later in Phase 2)
     danger_ambiguity: float = 0.0
     danger_adversarial: float = 0.0
     danger_irreversibility: float = 0.0
     danger_institutional: float = 0.0
-    
+
     # Deduplication
     content_hash: str                       # SHA256(problem+domain+tags) base58-encoded
     is_duplicate: bool = False
@@ -251,6 +265,7 @@ class Trace(BaseModel):
 ```
 
 #### Step
+
 ```python
 class Step(BaseModel):
     step_id: str                            # ULID (random, ensures uniqueness within trace)
@@ -261,18 +276,18 @@ class Step(BaseModel):
     role: StepRole                          # Enum: GOAL, QUESTION, PLAN, ACTION, OBSERVATION, CRITIQUE, DECISION, etc.
     fsm_id: Optional[str] = None            # Assigned FSM type (computed Phase 2)
     fsm_state: Optional[FSMState] = None    # Current state in FSM (S0-S9)
-    
+
     # Text storage (externalized)
     text_key: str                           # S3 URI: s3://bucket/trace-{id}/step-{id}/v{version}.md
     text_preview: str                       # First 500 chars (Neo4j stores for quick access)
     text_hash: str                          # SHA256 of full text (validation)
     text_version: int = 1                   # Current text version in S3
-    
+
     # Embeddings
     embedding_id: Optional[str] = None      # Qdrant point ID
     embedding_version: int = 1              # Version of text that was embedded
     embedding_stale: bool = False           # Flag if text updated after embedding
-    
+
     # Tool calls (optional)
     tool_name: Optional[ToolName] = None
     tool_input: Optional[Dict[str, Any]] = None
@@ -280,6 +295,7 @@ class Step(BaseModel):
 ```
 
 #### StepTextVersion
+
 ```python
 class StepTextVersion(BaseModel):
     """Stored in S3 as markdown + metadata JSON"""
@@ -293,6 +309,7 @@ class StepTextVersion(BaseModel):
 ```
 
 #### Edge
+
 ```python
 class Edge(BaseModel):
     edge_id: str                            # ULID
@@ -303,6 +320,7 @@ class Edge(BaseModel):
 ```
 
 #### EmbeddingRef
+
 ```python
 class EmbeddingRef(BaseModel):
     """Metadata for Qdrant point; embedding vectors stored separately"""
@@ -315,6 +333,7 @@ class EmbeddingRef(BaseModel):
 ```
 
 #### StepWindow (computed, stored in Qdrant)
+
 ```python
 class StepWindow(BaseModel):
     """Variable-length context group, stored in Qdrant step_windows collection"""
@@ -326,7 +345,7 @@ class StepWindow(BaseModel):
     fsm_id: Optional[str]                   # FSM type (for semantic alignment)
     concatenated_text: str                  # All step texts concatenated (markdown preserved)
     concatenated_hash: str                  # SHA256 of concatenated text
-    
+
     # Payload metadata (filterable in Qdrant)
     domain: DomainTag
     danger_ambiguity: float = 0.0
@@ -336,6 +355,7 @@ class StepWindow(BaseModel):
 ```
 
 **Versioning Strategy**:
+
 - `schema_version: "v1"` on all Traces (increments on breaking schema changes)
 - `trace_version: "1.0"` per trace (increments when trace re-ingested with different approach)
 - `text_version: int` on Steps (increments on text revision, triggers embedding staleness flag)
@@ -344,7 +364,8 @@ class StepWindow(BaseModel):
 ### 2. Storage API Contracts (contracts/)
 
 #### **ingestion-api.md**: HF Dataset → Neo4j/Qdrant
-```
+
+```text
 Input: HuggingFace dataset ID (e.g., "open-thoughts/OpenThoughts-114k")
 Output: TraceBundle
 - Trace (1 per dataset record / conversation)
@@ -363,7 +384,8 @@ Actions:
 ```
 
 #### **storage-api.md**: Neo4j Persistence
-```
+
+```text
 Constraints:
 - UNIQUE (trace_id)
 - UNIQUE (step_id)
@@ -384,7 +406,8 @@ Queries:
 ```
 
 #### **retrieval-api.md**: Qdrant Search
-```
+
+```text
 Collections:
 - steps: vectors (384 dims default) + payload {trace_id, step_id, index, role, domain, danger_*}
 - step_windows: vectors + payload {trace_id, window_size, fsm_id, danger_*, step_ids[]}
@@ -399,7 +422,8 @@ Latency Target: top-10 < 100ms (SC-004)
 ```
 
 #### **text-versioning-api.md**: S3 Markdown Management
-```
+
+```text
 PUT /trace/{trace_id}/step/{step_id}/v{version}.md
 - Store markdown content
 - Store metadata JSON (contributor_id, timestamp, change_note)
@@ -429,6 +453,7 @@ LIST /trace/{trace_id}/step/{step_id}
 **→ /speckit.tasks**: Convert this plan into 15-25 actionable tasks with dependencies, parallelization opportunities, and acceptance criteria.
 
 **Estimated task breakdown**:
+
 - Schema + validation: 2-3 tasks
 - Ingestion + parsing: 3-4 tasks
 - Neo4j persistence: 2-3 tasks

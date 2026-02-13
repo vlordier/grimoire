@@ -91,16 +91,16 @@ A compliance officer wants every ingested trace to include provenance (source, l
 
 - What happens when **HuggingFace dataset is rate-limited or unavailable**?  
   → Pipeline should retry with exponential backoff and log failures without data loss
-  
+
 - What happens when **Neo4j or Qdrant is unreachable during ingestion**?  
   → Batch should be rolled back and retried; ingestion is transactional per batch
-  
+
 - What happens when **embedding model fails or times out**?  
   → Step is stored in Neo4j without embedding; Qdrant insertion is skipped and logged for retry
-  
+
 - What happens when **duplicate trace_id is detected**?  
   → Skip and log as duplicate; update metadata if source provenance differs
-  
+
 - What happens when **schema version changes mid-ingestion**?  
   → New records use new schema version; migration path must be tested before deployment
 
@@ -178,6 +178,7 @@ A compliance officer wants every ingested trace to include provenance (source, l
 **Constitution Version**: 1.1.0
 
 This feature implements:
+
 - ✅ **Principle VI**: Canonical Schema Contract (Pydantic schema is single source of truth)
 - ✅ **Principle VII**: Dual-Store Architecture (Neo4j + Qdrant with shared IDs)
 - ✅ **Principle VIII**: Provenance and Licensing (full metadata tracking)
@@ -185,6 +186,7 @@ This feature implements:
 - ⚠️ **Principle IX**: Privacy and Safety (PII scrubbing deferred to future feature; sensitivity labeling only)
 
 **Quality Gates Applied**:
+
 1. Linting (Python: ruff/mypy)
 2. Test Suite (pytest with integration tests)
 3. Schema Validation (automated on every record)

@@ -1,11 +1,12 @@
 # Implementation Plan: 006-Pattern-Ranking
 
 ## Overview
+
 Build a pattern-scoring and ranking system that integrates danger/FSM context to prioritize high-value, low-risk reasoning patterns.
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │ Extracted Patterns (Phase 3.1)              │
 │ - pattern_id, targets, cost, effectiveness │
@@ -40,9 +41,11 @@ Build a pattern-scoring and ranking system that integrates danger/FSM context to
 ## Phases
 
 ### Phase 1: Design & Contracts (Days 1-2)
+
 **Deliverables**: Data models, API contracts, integration plan
 
 **Tasks**:
+
 1. Define RankedPattern Pydantic v2 model with all scoring fields
 2. Define RankingContext (fsm_type, domain, danger_scores)
 3. Define RankingOutput (ranked_patterns with explanations)
@@ -53,9 +56,11 @@ Build a pattern-scoring and ranking system that integrates danger/FSM context to
 **Risk**: Circular dependencies between scoring components → **Mitigation**: Rank by effectiveness first, inject context sequentially
 
 ### Phase 2: Scoring Engine (Days 2-5)
+
 **Deliverables**: All scoring functions, aggregation logic, Neo4j persistence
 
 **Tasks**:
+
 1. Implement effectiveness_score(feedback_events) → (0-1)
    - Filter events with min 5 for significance
    - Time-decay weighting (recent feedback 2x weight)
@@ -85,9 +90,11 @@ Build a pattern-scoring and ranking system that integrates danger/FSM context to
    - Index by effectiveness_score, created_date
 
 ### Phase 3: API & Integration (Days 5-7)
+
 **Deliverables**: Batch ranking API, integration tests, Phase 2.1/2.2 consumption
 
 **Tasks**:
+
 1. Implement batch_rank_patterns(patterns, context) → RankingOutput
    - Input: 1000-1M patterns (with metadata)
    - Output: Sorted list with score breakdown
@@ -111,9 +118,11 @@ Build a pattern-scoring and ranking system that integrates danger/FSM context to
    - Re-rank top N patterns on each batch of K events
 
 ### Phase 4: Testing & Optimization (Days 7-8)
+
 **Deliverables**: 95% coverage, performance benchmarks, safety tests
 
 **Tasks**:
+
 1. Unit tests: All scoring functions (deterministic, edge cases)
    - effectiveness_score: min/max values, time decay
    - safety_flag: all danger combinations
@@ -142,12 +151,14 @@ Build a pattern-scoring and ranking system that integrates danger/FSM context to
 ## Dependencies
 
 ### Internal Dependencies
+
 - **Phase 1 (Canonical Schema)**: Pattern model (already implemented ✅)
 - **Phase 2.1 (Danger Classifier)**: DangerScore contract + output consumption
 - **Phase 2.2 (FSM Router)**: FSMClassification contract + output consumption
 - **Phase 3.1 (Pattern Extraction)**: Pattern extraction output (to be implemented)
 
 ### External Dependencies
+
 - **Neo4j 5.x**: Graph persistence, relationships
 - **Feedback Event Bus**: Pattern execution feedback (from Phase 3.3)
 - **Pydantic v2**: Data validation
@@ -195,10 +206,12 @@ Build a pattern-scoring and ranking system that integrates danger/FSM context to
 ## Handoff to Phase 3.3
 
 **Outputs to Phase 3.3**:
+
 - RankedPattern model (pattern_id, effectiveness_score, safety_flag, relevance_score, final_rank)
 - Ranking history (for trend analysis, concept drift detection)
 - Feedback consumption API (for optimization loop to update scores)
 
 **Inputs from Phase 3.3**:
+
 - Feedback events (success, outcome_quality, user_satisfaction, latency, memory)
 - Re-ranking triggers (every K events or T seconds)

@@ -16,7 +16,7 @@ from enum import Enum
 
 class GuardName(str, Enum):
     """Names of the 4 transition guards."""
-    
+
     NO_EXECUTE_AMBIGUOUS = "NO_EXECUTE_AMBIGUOUS"
     NO_IRREVERSIBLE_UNVERIFIED = "NO_IRREVERSIBLE_UNVERIFIED"
     ADVERSARIAL_REQUIRES_MONITORING = "ADVERSARIAL_REQUIRES_MONITORING"
@@ -28,7 +28,7 @@ class GuardName(str, Enum):
 ```python
 class DecisionType(str, Enum):
     """Types of guard decisions."""
-    
+
     ALLOW = "ALLOW"              # Proceed normally
     BLOCK = "BLOCK"              # Blocked by guard
     ESCALATE = "ESCALATE"        # Proceed but route to monitoring/approval
@@ -48,7 +48,7 @@ from typing import Optional
 
 class GuardDecision(BaseModel):
     """Decision from a single guard."""
-    
+
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "guard_name": "NO_EXECUTE_AMBIGUOUS",
@@ -58,27 +58,27 @@ class GuardDecision(BaseModel):
             "evidence_score": 0.85
         }
     })
-    
+
     guard_name: GuardName = Field(
         ...,
         description="Name of this guard"
     )
-    
+
     allowed: bool = Field(
         ...,
         description="Whether this guard allows the transition"
     )
-    
+
     reason: str = Field(
         ...,
         description="Human-readable reason for this decision"
     )
-    
+
     escalation_path: Optional[str] = Field(
         default=None,
         description="Queue/path for escalation (if applicable)"
     )
-    
+
     evidence_score: float = Field(
         ...,
         description="The danger score that triggered this decision",
@@ -98,7 +98,7 @@ from typing import List
 
 class TransitionGuardResponse(BaseModel):
     """Aggregated result of all guard checks for a transition."""
-    
+
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "step_id": "step-001-xyz",
@@ -121,42 +121,42 @@ class TransitionGuardResponse(BaseModel):
             "checked_at": "2024-01-15T10:30:45.123456Z"
         }
     })
-    
+
     step_id: str = Field(
         ...,
         description="ID of step being checked"
     )
-    
+
     allowed: bool = Field(
         ...,
         description="Final decision: can transition proceed?"
     )
-    
+
     decision_type: DecisionType = Field(
         ...,
         description="Type of decision: ALLOW, BLOCK, ESCALATE"
     )
-    
+
     blocking_reason: Optional[str] = Field(
         default=None,
         description="Why transition was blocked (if blocked)"
     )
-    
+
     decisions: List[GuardDecision] = Field(
         default_factory=list,
         description="Individual decisions from all guards"
     )
-    
+
     escalations: List[GuardDecision] = Field(
         default_factory=list,
         description="Guards requesting escalation"
     )
-    
+
     checked_at: datetime = Field(
         default_factory=datetime.utcnow,
         description="When guard checking occurred"
     )
-    
+
     @model_validator(mode="after")
     def validate_consistency(self):
         """Ensure consistency between allowed and decision_type."""
@@ -176,7 +176,7 @@ Configuration for guard thresholds.
 ```python
 class GuardConfig(BaseModel):
     """Configuration for danger thresholds."""
-    
+
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "block_ambiguity_threshold": 0.7,
@@ -185,28 +185,28 @@ class GuardConfig(BaseModel):
             "escalate_institutional_threshold": 0.6
         }
     })
-    
+
     block_ambiguity_threshold: float = Field(
         default=0.7,
         description="Ambiguity ≥ this → block execute",
         ge=0.0,
         le=1.0
     )
-    
+
     block_irreversibility_threshold: float = Field(
         default=0.7,
         description="Irreversibility ≥ this → require verification",
         ge=0.0,
         le=1.0
     )
-    
+
     escalate_adversarial_threshold: float = Field(
         default=0.6,
         description="Adversarial ≥ this → escalate to monitoring",
         ge=0.0,
         le=1.0
     )
-    
+
     escalate_institutional_threshold: float = Field(
         default=0.6,
         description="Institutional ≥ this → escalate to stakeholders",
@@ -226,27 +226,27 @@ from typing import Optional
 
 class TransitionGuardRequest(BaseModel):
     """Request to check guards on a transition."""
-    
+
     step_id: str = Field(
         ...,
         description="ID of the step being created/transitioned"
     )
-    
+
     trace_id: str = Field(
         ...,
         description="ID of the trace containing this step"
     )
-    
+
     proposed_role: str = Field(
         ...,
         description="Role the step is transitioning to (execute, observe, etc.)"
     )
-    
+
     danger_scores: Optional[Dict] = Field(
         default=None,
         description="DangerScores from Phase 2.1 classifier"
     )
-    
+
     fsm_state: Optional[str] = Field(
         default=None,
         description="Current FSM state (from Phase 2.2)"

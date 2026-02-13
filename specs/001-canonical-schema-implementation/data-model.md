@@ -6,7 +6,7 @@
 
 ## Overview
 
-```
+```text
 Trace (root entity: problem + thoughts)
   ├── Step[] (sequence of actions/observations)
   │   └── StepTextVersion (markdown with audit trail)
@@ -90,7 +90,7 @@ import json
 
 class SourceRef(BaseModel):
     """Reference to source dataset or origin"""
-    
+
     source_type: Literal["huggingface", "chat", "tool_run", "repo", "paper", "other"] = Field(
         description="Origin type — aligned to canonical SourceType enum"
     )
@@ -103,7 +103,7 @@ class SourceRef(BaseModel):
         default=None,
         description="Index or ID within source dataset (alphanumeric + underscore, max 300 chars)"
     )
-    
+
     @field_validator("record_id")
     @classmethod
     def record_id_format(cls, v):
@@ -117,7 +117,7 @@ class SourceRef(BaseModel):
                     f"got '{v}' with invalid characters"
                 )
         return v
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -138,13 +138,13 @@ class Trace(BaseModel):
     Canonical representation of a single reasoning problem and its solution trace.
     Immutable once created; edits go to Step text versions.
     """
-    
+
     # Identity
     trace_id: str = Field(
         description="Unique identifier: base58(SHA256(problem+domain+tags))[:12] + '-' + ULID[:8]",
         pattern="^[a-zA-Z0-9]{12}-[a-zA-Z0-9]{8}$"
     )
-    
+
     # Problem description
     title: str = Field(
         min_length=10,
@@ -160,7 +160,7 @@ class Trace(BaseModel):
         default=DomainTag.GENERAL,
         description="Classification for filtering"
     )
-    
+
     # Versioning
     trace_version: int = Field(
         default=1,
@@ -171,14 +171,14 @@ class Trace(BaseModel):
         description="SHA256(problem) for deduplication",
         pattern="^[a-f0-9]{64}$"
     )
-    
+
     # Statistics
     n_steps: int = Field(
         ge=1,
         le=10000,
         description="Number of steps in reasoning chain"
     )
-    
+
     # Provenance (Principle IX: Immutable origin tracking)
     provenance_sources: List[SourceRef] = Field(
         min_length=1,
@@ -204,7 +204,7 @@ class Trace(BaseModel):
         description="Data model version for compatibility",
         examples=["v1", "v1.1"]
     )
-    
+
     # Timestamps
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: Optional[datetime] = Field(
@@ -215,7 +215,7 @@ class Trace(BaseModel):
         default=None,
         description="Soft-delete timestamp"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -255,7 +255,7 @@ class Step(BaseModel):
     Single step in reasoning chain (user query, assistant response, thought, etc.).
     Text is externalized to S3; only key and preview stored here.
     """
-    
+
     # Identity
     step_id: str = Field(
         description="ULID: unique within trace",
@@ -264,14 +264,14 @@ class Step(BaseModel):
     trace_id: str = Field(
         description="Parent trace reference"
     )
-    
+
     # Position
     index: int = Field(
         ge=0,
         le=10000,
         description="Position in step sequence (0-indexed)"
     )
-    
+
     # Semantics
     role: StepRole = Field(
         description="Semantic classification of this step"
@@ -280,7 +280,7 @@ class Step(BaseModel):
         examples=["user", "assistant", "system"],
         description="Who initiated this step"
     )
-    
+
     # Text (externalized to S3)
     text_key: str = Field(
         description="S3 object key: steps/{trace_id}/{step_id}.md",
@@ -299,7 +299,7 @@ class Step(BaseModel):
         ge=1,
         description="Increments when text edited (FR-013)"
     )
-    
+
     # Embedding (Principle VII: Dual-store, Principle VI: Schema)
     embedding_id: Optional[str] = Field(
         default=None,
@@ -309,7 +309,7 @@ class Step(BaseModel):
         default=None,
         description="Bound to text_version; NULL if needs re-embedding"
     )
-    
+
     # Danger scores (aligned to canonical DangerScores; populated in Phase 2)
     danger_ambiguity: Optional[float] = Field(
         default=None, ge=0.0, le=1.0,
@@ -327,7 +327,7 @@ class Step(BaseModel):
         default=None, ge=0.0, le=1.0,
         description="Institutional danger score; None until computed"
     )
-    
+
     # Timestamps
     created_at: datetime = Field(description="When step was first recorded")
     updated_at: Optional[datetime] = Field(
@@ -338,7 +338,7 @@ class Step(BaseModel):
         default=None,
         description="Soft-delete timestamp"
     )
-    
+
     @field_validator("text_version")
     @classmethod
     def text_version_consistency(cls, v, info):
@@ -347,7 +347,7 @@ class Step(BaseModel):
             if info.data["embedding_version"] > v:
                 raise ValueError("embedding_version cannot exceed text_version")
         return v
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -379,7 +379,7 @@ class Edge(BaseModel):
     Relationship or connection between two steps.
     Default is NEXT (sequential); others capture reasoning structure.
     """
-    
+
     edge_id: str = Field(
         description="ULID for audit trail",
         pattern="^[a-zA-Z0-9]{26}$"
@@ -400,12 +400,12 @@ class Edge(BaseModel):
         le=1.0,
         description="Confidence or strength (0=weak, 1=strong)"
     )
-    
+
     metadata: Optional[dict] = Field(
         default=None,
         description="Optional edge-specific data (e.g., reasoning for REFINES)"
     )
-    
+
     @field_validator("src_id", "dst_id")
     @classmethod
     def ids_must_differ(cls, v, info):
@@ -413,7 +413,7 @@ class Edge(BaseModel):
         if "src_id" in info.data and info.data["src_id"] == v and v == info.data.get("dst_id"):
             raise ValueError("Edge cannot loop to itself")
         return v
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -437,7 +437,7 @@ class Embedding(BaseModel):
     Vector embedding for semantic search.
     Stored in Qdrant; linked to Step via embedding_id + text_version.
     """
-    
+
     embedding_id: str = Field(
         description="Reference to step_id"
     )
@@ -453,7 +453,7 @@ class Embedding(BaseModel):
     text_version_bound: int = Field(
         description="Bound to Step.text_version; increment on edit"
     )
-    
+
     # Danger markers (computed in Phase 2; range [0, 1])
     danger_ambiguity: float = Field(
         default=0.0,
@@ -483,13 +483,13 @@ class Embedding(BaseModel):
         default=False,
         description="True when text edited but danger not yet recomputed"
     )
-    
+
     created_at: datetime = Field(description="When embedding computed")
     updated_at: Optional[datetime] = Field(
         default=None,
         description="When danger markers recalculated"
     )
-    
+
     @field_validator("vector")
     @classmethod
     def vector_magnitude(cls, v):
@@ -499,7 +499,7 @@ class Embedding(BaseModel):
             # Not normalized; OK but warn in logs
             pass
         return v
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -527,7 +527,7 @@ class StepTextVersion(BaseModel):
     Version entry for Step text (stored in S3 metadata).
     Multi-contributor edit history with compliance markers.
     """
-    
+
     version_number: int = Field(
         ge=1,
         description="Version sequence"
@@ -536,7 +536,7 @@ class StepTextVersion(BaseModel):
         default=None,
         description="Link to predecessor version"
     )
-    
+
     content_hash: str = Field(
         pattern="^[a-f0-9]{64}$",
         description="SHA256(text) for integrity"
@@ -545,7 +545,7 @@ class StepTextVersion(BaseModel):
         default=None,
         description="Hash of previous version (for diff)"
     )
-    
+
     # Attribution (Principle X: Privacy & Safety)
     contributor_id: str = Field(
         description="User ID or system identifier"
@@ -558,7 +558,7 @@ class StepTextVersion(BaseModel):
         examples=["Fixed grammar", "Clarified reasoning", "Corrected calculation"],
         description="Summary of change"
     )
-    
+
     # Metadata
     language_hint: str = Field(
         default="english",
@@ -572,7 +572,7 @@ class StepTextVersion(BaseModel):
         default=None,
         description="Bytes changed from previous version"
     )
-    
+
     # Compliance
     is_deleted: bool = Field(
         default=False,
@@ -587,7 +587,7 @@ class StepTextVersion(BaseModel):
         default=None,
         description="When soft-deleted"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -618,14 +618,14 @@ class StepWindow(BaseModel):
     Contextual window of steps for reasoning FSM.
     Variably-sized based on FSM type (RQ-5: FSM-adaptive windows).
     """
-    
+
     center_step_id: str = Field(
         description="Step at window center"
     )
     center_index: int = Field(
         description="Position in trace"
     )
-    
+
     # Preceding context
     predecessor_steps: List[Step] = Field(
         default=[],
@@ -635,7 +635,7 @@ class StepWindow(BaseModel):
         default=-1,
         description="Index of earliest predecessor (-1 if none)"
     )
-    
+
     # Succeeding context (potential outcomes)
     successor_steps: List[Step] = Field(
         default=[],
@@ -645,7 +645,7 @@ class StepWindow(BaseModel):
         default=-1,
         description="Index of latest successor (-1 if none)"
     )
-    
+
     # FSM classification (determines window depth)
     fsm_type: Literal[
         "hierarchical",
@@ -658,7 +658,7 @@ class StepWindow(BaseModel):
     window_depth: int = Field(
         description="Actual depth used (varies by FSM_type)"
     )
-    
+
     # Computed for context quality
     total_context_steps: int = Field(
         description="Sum of predecessors + center + successors"
@@ -671,7 +671,7 @@ class StepWindow(BaseModel):
         default=False,
         description="Whether window includes ANSWER step"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -705,7 +705,7 @@ class PatternType(str, Enum):
 
 class PatternTemplateStep(BaseModel):
     """Template for a step within a pattern"""
-    
+
     role: Literal[
         "goal", "question", "plan", "action", "tool_call", "observation",
         "critique", "revision", "decision", "verification", "summary", "other"
@@ -723,7 +723,7 @@ class PatternTemplateStep(BaseModel):
         default_factory=dict,
         description="Variable names and descriptions for template substitution"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -740,7 +740,7 @@ class PatternTemplateStep(BaseModel):
 
 class PatternApplicability(BaseModel):
     """Constraints and filters for when a pattern applies"""
-    
+
     fsm_id: Optional[str] = Field(
         default=None,
         description="FSM instance ID (if pattern is FSM-specific)"
@@ -769,7 +769,7 @@ class PatternApplicability(BaseModel):
         default_factory=dict,
         description="Max danger thresholds (e.g., {'adversarial': 0.5})"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -786,7 +786,7 @@ class PatternApplicability(BaseModel):
 
 class PatternQuality(BaseModel):
     """Metrics and quality measures for a pattern"""
-    
+
     support: int = Field(
         default=0,
         ge=0,
@@ -813,7 +813,7 @@ class PatternQuality(BaseModel):
         default=None,
         description="Timestamp of last quality metric update"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -828,7 +828,7 @@ class PatternQuality(BaseModel):
 
 class Pattern(BaseModel):
     """Reusable reasoning pattern detected or mined from traces"""
-    
+
     pattern_id: str = Field(
         pattern="^[a-zA-Z0-9]{12}-[a-zA-Z0-9]{8}$",
         description="Unique pattern ID (base58 format)"
@@ -836,7 +836,7 @@ class Pattern(BaseModel):
     type: PatternType = Field(
         description="Pattern detection method"
     )
-    
+
     name: str = Field(
         description="Human-readable pattern name (e.g., 'Binary Search Optimization')"
     )
@@ -844,7 +844,7 @@ class Pattern(BaseModel):
         default=None,
         description="Detailed description of pattern behavior"
     )
-    
+
     applicability: PatternApplicability = Field(
         default_factory=PatternApplicability,
         description="When this pattern should be applied"
@@ -861,7 +861,7 @@ class Pattern(BaseModel):
         default_factory=PatternQuality,
         description="Quality metrics"
     )
-    
+
     created_at: Optional[datetime] = Field(
         default=None,
         description="When pattern was first detected"
@@ -874,7 +874,7 @@ class Pattern(BaseModel):
         default="v1",
         description="Schema version for evolution"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -902,7 +902,7 @@ class Pattern(BaseModel):
 
 class PatternInstance(BaseModel):
     """Instantiation of a pattern within a specific trace"""
-    
+
     instance_id: str = Field(
         pattern="^[a-zA-Z0-9]{12}-[a-zA-Z0-9]{8}$",
         description="Unique instance ID"
@@ -913,7 +913,7 @@ class PatternInstance(BaseModel):
     trace_id: str = Field(
         description="Trace where pattern was found"
     )
-    
+
     step_ids: list = Field(
         default_factory=list,
         description="Sequence of step IDs matching pattern template"
@@ -928,7 +928,7 @@ class PatternInstance(BaseModel):
         le=1.0,
         description="Quality score for this instance"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -952,7 +952,7 @@ class TraceBundle(BaseModel):
     Transactional unit for ingestion.
     All-or-nothing: if any component fails validation, entire bundle rejected.
     """
-    
+
     trace: Trace
     steps: List[Step] = Field(
         min_length=1,
@@ -962,24 +962,24 @@ class TraceBundle(BaseModel):
         default_factory=list,
         description="Relationships (typically NEXT edges)"
     )
-    
+
     @field_validator("steps")
     @classmethod
     def steps_must_be_ordered(cls, v):
         """Validate step indexes are contiguous 0..n-1"""
         if not v:
             raise ValueError("Must have at least 1 step")
-        
+
         actual_indices = sorted(set(s.index for s in v))
         expected_indices = list(range(len(v)))
-        
+
         if actual_indices != expected_indices:
             raise ValueError(
                 f"Step indexes must be contiguous starting at 0; "
                 f"got {actual_indices}, expected {expected_indices}"
             )
         return v
-    
+
     @field_validator("trace")
     @classmethod
     def trace_step_count_matches(cls, v, info):
@@ -991,24 +991,24 @@ class TraceBundle(BaseModel):
                     f"actual steps count ({len(info.data['steps'])})"
                 )
         return v
-    
+
     @field_validator("edges")
     @classmethod
     def edges_reference_valid_steps(cls, v, info):
         """Every edge must reference existing steps"""
         if "steps" not in info.data:
             return v
-        
+
         step_ids = set(s.step_id for s in info.data["steps"])
-        
+
         for edge in v:
             if edge.src_id not in step_ids:
                 raise ValueError(f"Edge references unknown step {edge.src_id}")
             if edge.dst_id not in step_ids:
                 raise ValueError(f"Edge references unknown step {edge.dst_id}")
-        
+
         return v
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -1042,7 +1042,7 @@ class TraceBundle(BaseModel):
 # Export JSON schemas for OpenAPI/documentation
 if __name__ == "__main__":
     from json import dumps
-    
+
     schemas = {
         "Trace": Trace.model_json_schema(),
         "Step": Step.model_json_schema(),
@@ -1052,7 +1052,7 @@ if __name__ == "__main__":
         "StepWindow": StepWindow.model_json_schema(),
         "TraceBundle": TraceBundle.model_json_schema(),
     }
-    
+
     for name, schema in schemas.items():
         with open(f"schemas/{name}.json", "w") as f:
             f.write(dumps(schema, indent=2))
@@ -1060,7 +1060,7 @@ if __name__ == "__main__":
 
 ---
 
-## Compatibility 
+## Compatibility
 
 - **Pydantic v2**: All models use `BaseModel` from `pydantic` (v2.x)
 - **JSON Serialization**: All models support `.model_dump_json()` and `.model_validate_json()`

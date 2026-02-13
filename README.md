@@ -97,7 +97,8 @@ Each feature directory contains: `spec.md`, `plan.md`, `research.md`, `data-mode
 ### ID Format Consistency
 
 All canonical IDs **must** follow:
-- `trace_id`: `^[a-zA-Z0-9]{12}-[a-zA-Z0-9]{8}$` — composite (base58(SHA256)[:12] + ULID[:8])
+
+- `trace_id`: `^[a-zA-Z0-9]{12}-[a-zA-Z0-9]{8}$` — composite (base58[:12](SHA256) + ULID[:8])
 - `step_id`, `edge_id`, `pattern_id`: ULID (26 chars, alphanumeric)
 - `content_hash`: `^[a-f0-9]{64}$` — SHA256 lowercase hex
 
@@ -106,6 +107,7 @@ Mismatch causes Neo4j constraint violations and Qdrant query failures.
 ### Enum Values
 
 All enums **must** use lowercase string values matching canonical definitions:
+
 - `DomainTag`: "general", "software", "ml", "data", "security", "product", "legal", "health", "finance"
 - `StepRole`: "goal", "question", "plan", "action", "tool_call", "observation", "critique", "revision", "decision", "verification", "summary", "other"
 - `EdgeType`: "next", "supports", "refutes", "revises", "depends_on", "uses_tool", "mentions", "evidence_for", "decision_for", "instance_of", "creates", "uses", "other"

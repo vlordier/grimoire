@@ -8,56 +8,62 @@
 
 ## Key Questions & Decisions
 
-### Q1: Rules-Based vs LLM-Based Classification?
+### Q1: Rules-Based vs LLM-Based Classification
 
 **Question**: Should router use keyword matching (rules) or LLM classifier?
 
 **Decision**: **Rules-based (keyword matching) for v1; LLM in v2+**
 
 **Rationale**:
+
 - Keywords are deterministic, fast (<50ms), no API calls
 - Reference implementation (FSM Router) has working keyword patterns
 - Extensible: config file allows team to add/tune keywords
 - v2 can add LLM for higher accuracy without breaking v1 API
 
 **Trade-offs**:
+
 - ✅ Pro: Fast, cheap, no external dependency
 - ❌ Con: Lower accuracy on edge cases; needs tuning
 - ✅ Mitigation: Fallback to clarify_frame when confidence low
 
 ---
 
-### Q2: What Confidence Threshold for Auto-Routing?
+### Q2: What Confidence Threshold for Auto-Routing
 
 **Question**: At what confidence level should router commit to an FSM? Below that threshold, what happens?
 
 **Decision**: **Threshold = 0.5 (50% keyword match); below = fallback to `fsm_clarify_frame`**
 
 **Rationale**:
+
 - 50% means keywords found in multiple categories
 - Clarify_frame is safe default (narrows scope first before committing to strategy)
 - Conservative: better to ask clarifying questions than guess wrong FSM
 
 **Examples**:
+
 - "Debug the timeout bug" → confidence 0.8 (fsm_diagnose_fix) ✅
 - "Improve performance" → confidence 0.4 (below threshold → fsm_clarify_frame) ⚠️
 - "Do something good" → confidence 0.0 (fsm_clarify_frame) ⚠️
 
 ---
 
-### Q3: Multi-FSM Problems — Return Multiple Suggestions?
+### Q3: Multi-FSM Problems — Return Multiple Suggestions
 
 **Question**: Some problems fit multiple FSMs equally well (e.g., "optimize by redesigning schema"). How to handle?
 
 **Decision**: **Return 1 primary FSM; include top 2-3 alternatives in response metadata**
 
 **Rationale**:
+
 - Simplifies FSM transitions (one path forward)
 - Alternatives provide transparency for manual override
 - User can switch to alternative if primary doesn't feel right
 
 **Example**:
-```
+
+```text
 Problem: "Performance tuning requires schema redesign"
 
 Primary: fsm_optimize (confidence 0.65)
@@ -70,13 +76,14 @@ Alternatives:
 
 ---
 
-### Q4: Should FSM Selection Depend on Danger Scores (002)?
+### Q4: Should FSM Selection Depend on Danger Scores (002)
 
 **Question**: Should router use danger classifier output to refine FSM selection?
 
 **Decision**: **No hard dependency in v1; optional refinement in Phase 3**
 
 **Rationale**:
+
 - Decouples Phase 2.2 from Phase 2.1 (can develop in parallel)
 - Danger scores improve confidence but not strictly required
 - Phase 3 optimization: "adversarial problem → fsm_adversarial_loop"
@@ -86,18 +93,20 @@ Alternatives:
 
 ---
 
-### Q5: How to Extend Keywords — Config-Driven or Code?
+### Q5: How to Extend Keywords — Config-Driven or Code
 
 **Question**: Should new keywords require code deploy or config update?
 
 **Decision**: **Config-driven (routing_config.yaml) — no code change needed**
 
 **Rationale**:
+
 - Domain experts can add keywords without eng involvement
 - Easy A/B testing of keyword sets
 - Fast feedback loop for tuning
 
 **Example**:
+
 ```yaml
 fsm_adversarial_loop:
   keywords:
@@ -112,18 +121,20 @@ Restart → new keywords take effect. Zero code change.
 
 ---
 
-### Q6: Performance Target — How Fast Should Routing Be?
+### Q6: Performance Target — How Fast Should Routing Be
 
 **Question**: What's acceptable latency for FSM routing?
 
 **Decision**: **P50 < 50ms, P99 < 100ms per route**
 
 **Rationale**:
+
 - Keyword matching can be optimized to sub-50ms (regex compiled at startup)
 - 100ms on P99 allows some overhead
 - Batch 1000 traces in < 100 seconds (1000 × 50ms baseline + overhead)
 
 **Performance Breakdown** (estimated):
+
 - Regex compilation (startup): 5ms
 - Text preprocessing: 5ms
 - Keyword matching: 30ms
@@ -132,37 +143,41 @@ Restart → new keywords take effect. Zero code change.
 
 ---
 
-### Q7: Fallback Behavior — What If Routing Crashes?
+### Q7: Fallback Behavior — What If Routing Crashes
 
 **Question**: If keyword matching crashes/fails, what happens?
 
 **Decision**: **Graceful degradation: return default FSM (clarify_frame, confidence 0.0)**
 
 **Rationale**:
+
 - System stays operational (no data loss)
 - Safety-first: clarify_frame is appropriate default
 - Log error for debugging
 
 **Example**:
-```
+
+```text
 ERROR: Regex compilation failed for FSM patterns
 FALLBACK: Routing to fsm_clarify_frame (confidence=0.0, classifier_version="1.0.0-degraded")
 ```
 
 ---
 
-### Q8: How to Evaluate Accuracy — What's "Good Enough"?
+### Q8: How to Evaluate Accuracy — What's "Good Enough"
 
 **Question**: How do we measure if router is routing correctly?
 
 **Decision**: **80%+ human agreement on evaluation set (20 representative problems)**
 
 **Rationale**:
+
 - Human reviewers provide ground truth
 - 80% is reasonable bar (catches obvious errors, allows noise)
 - Representative set captures domain diversity
 
 **Evaluation Process**:
+
 1. Select 20 diverse problems (from Phase 1 historical data)
 2. Route each via router
 3. Have 2 domain experts review each; score correctness
@@ -171,18 +186,20 @@ FALLBACK: Routing to fsm_clarify_frame (confidence=0.0, classifier_version="1.0.
 
 ---
 
-### Q9: Upgrade Path — How to Evolve from v1 (Rules) to v2 (LLM)?
+### Q9: Upgrade Path — How to Evolve from v1 (Rules) to v2 (LLM)
 
 **Question**: How do we add LLM-based routing in v2 without breaking v1 clients?
 
 **Decision**: **Pluggable scorer interface (abstract base); v2 implements LLM scorer**
 
 **Rationale**:
+
 - API stays same (FSMRouterRequest → FSMRouterResponse)
 - Backend swapped out (rules scorer → LLM scorer)
 - Clients don't notice the change
 
 **Architecture**:
+
 ```python
 class FSMScorer(Protocol):
     def score(text: str) -> FSMRoute: ...
@@ -199,13 +216,14 @@ router = FSMRouter(scorer=LLMScorer())      # v2 (drop-in replacement)
 
 ---
 
-### Q10: Language Support — English-Only or Multilingual?
+### Q10: Language Support — English-Only or Multilingual
 
 **Question**: Should router support non-English problems?
 
 **Decision**: **English-only in v1; multilingual Phase 3+**
 
 **Rationale**:
+
 - Keyword lists optimized for English
 - Reference data (Phase 1 traces) mostly English
 - Faster MVP; multilingual adds complexity
