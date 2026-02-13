@@ -17,6 +17,21 @@ This document clarifies control flow patterns (if/else, for loops, while loops) 
 
 ---
 
+## Quick Reference Table
+
+| Part | Content | Key Classes |
+|------|---------|-------------|
+| **Part 1** | Core Primitives | `IfElseControlFlow`, `EnumeratedForLoop`, `WhileLoop` |
+| **Part 2** | Deterministic Functions | `PercentageEvaluator`, `Counter`, `AdaptiveCounter` |
+| **Part 3** | Prompt Templates | Branch, Loop, Percentage prompts |
+| **Part 4** | Complete Examples | Pattern ranking, score optimization |
+| **Part 5** | Composed Patterns | `SwitchMatch`, `TryCatchFinally`, `Pipeline` |
+| **Part 6** | Pattern Detection | `ControlFlowDetector`, `LoopEnforcer` |
+| **Part 7** | Testing | Property-based tests with Hypothesis |
+| **Part 8** | Extensions | `ControlFlowBuilder` for custom patterns |
+
+---
+
 ## Part 1: Core Control Flow Primitives
 
 ### 1.1 Branching (If/Else)
@@ -1078,3 +1093,1034 @@ result = optimize_confidence_score(0.3, target_confidence=0.95)
 - [ ] Prompt templates for each control flow type
 - [ ] Complete examples with branching + loops + percentages
 - [ ] Unit tests for all primitives
+
+---
+
+## Part 5: Composed Control Flow Patterns
+
+### 5.1 Switch/Match Statement
+
+```python
+# core/control_flow/switch.py
+from typing import Callable, Any, Optional, Dict, List
+from dataclasses import dataclass
+from enum import Enum
+
+
+class MatchResult(Enum):
+    """Result of pattern matching."""
+    MATCHED = "matched"
+    NO_MATCH = "no_match"
+    FALLTHROUGH = "fallthrough"
+
+
+@dataclass
+class Case:
+    """A case in switch/match logic."""
+    pattern: Any  # Can be value, regex, or callable
+    action: Callable[[Any], Any]
+    is_default: bool = False
+
+
+class SwitchMatch:
+    """
+    Implements switch/match control flow with multiple matching strategies.
+    
+    Usage:
+        switch = SwitchMatch(key="status")
+        switch.case("active", lambda x: activate(x))
+        switch.case("pending", lambda x: notify(x))
+        switch.case(lambda x: x > 10, lambda x: handle_high(x))  # Predicate
+        switch.default(lambda x: unknown(x))
+        result = switch.evaluate({"status": "active"})
+    """
+    
+    def __init__(self, key: str = None):
+        self.key = key
+        self.cases: List[Case] = []
+        self.default_case: Optional[Case] = None
+    
+    def case(self, pattern: Any, action: Callable[[Any], Any]) -> "SwitchMatch":
+        """Add a case with exact match or predicate."""
+        case = Case(
+            pattern=pattern,
+            action=action,
+            is_default=False
+        )
+        self.cases.append(case)
+        return self
+    
+    def case_predicate(self, predicate: Callable[[Any], bool], action: Callable[[Any], Any]) -> "SwitchMatch":
+        """Add a case with predicate matching."""
+        case = Case(
+            pattern=predicate,  # Store predicate as pattern
+            action=action,
+            is_default=False
+        )
+        self.cases.append(case)
+        return self
+    
+    def default(self, action: Callable[[Any], Any]) -> "SwitchMatch":
+        """Add default case (executed when no match found)."""
+        self.default_case = Case(
+            pattern=None,
+            action=action,
+            is_default=True
+        )
+        return self
+    
+    def evaluate(self, value: Any) -> Any:
+        """Evaluate switch/match against value."""
+        # Get value if key specified
+        target = value.get(self.key, value) if self.key else value
+        
+        for case in self.cases:
+            matched = False
+            
+            if callable(case.pattern):
+                # Predicate match
+                try:
+                    matched = case.pattern(target)
+                except:
+                    matched = False
+            else:
+                # Exact match
+                matched = case.pattern == target
+            
+            if matched:
+                return case.action(target)
+        
+        # Default case
+        if self.default_case:
+            return self.default_case.action(target)
+        
+        return None
+
+
+class PatternSwitch:
+    """Specialized switch for pattern type routing."""
+    
+    def __init__(self):
+        self.handlers: Dict[str, Callable] = {}
+        self.default_handler: Optional[Callable] = None
+    
+    def on_pattern(self, pattern_type: str) -> Callable:
+        """Decorator to register pattern handler."""
+        def decorator(func: Callable) -> Callable:
+            self.handlers[pattern_type] = func
+            return func
+        return decorator
+    
+    def on_default(self, func: Callable) -> Callable:
+        """Register default handler."""
+        self.default_handler = func
+        return func
+    
+    def dispatch(self, pattern: dict) -> Any:
+        """Dispatch to appropriate handler."""
+        pattern_type = pattern.get("pattern_type", "unknown")
+        
+        handler = self.handlers.get(pattern_type, self.default_handler)
+        
+        if handler:
+            return handler(pattern)
+        
+        raise ValueError(f"No handler for pattern type: {pattern_type}")
+```
+
+### 5.2 Try/Catch/Finally
+
+```python
+# core/control_flow/exception_handling.py
+from typing import Callable, Any, Optional, List, Type
+from dataclasses import dataclass
+from enum import Enum
+import traceback
+
+
+class ExceptionSeverity(Enum):
+    """Severity of caught exception."""
+    LOW = "low"       # Log and continue
+    MEDIUM = "medium" # Retry with fallback
+    HIGH = "high"     # Block execution
+
+
+@dataclass
+class ExceptionHandler:
+    """Handler for specific exception type."""
+    exception_type: Type[Exception]
+    severity: ExceptionSeverity
+    action: Callable[[Exception], Any]
+    retry_count: int = 0
+
+
+class TryCatchFinally:
+    """
+    Implements try/catch/finally with retry and fallback logic.
+    
+    Usage:
+        result = TryCatchFinally()
+            .try(lambda: risky_operation())
+            .catch(ValueError, severity=HIGH, action=handle_value_error)
+            .catch(TimeoutError, severity=MEDIUM, action=retry_with_fallback)
+            .finally(lambda: cleanup())
+            .execute()
+    """
+    
+    def __init__(self):
+        self.try_block: Optional[Callable] = None
+        self.catch_blocks: List[ExceptionHandler] = []
+        self.finally_block: Optional[Callable] = None
+        self.result: Any = None
+        self.error: Optional[Exception] = None
+    
+    def try_block(self, func: Callable) -> "TryCatchFinally":
+        """Set the try block."""
+        self.try_block = func
+        return self
+    
+    def catch(
+        self,
+        exception_type: Type[Exception],
+        severity: ExceptionSeverity = ExceptionSeverity.MEDIUM,
+        action: Callable[[Exception], Any] = None,
+        retry_count: int = 0
+    ) -> "TryCatchFinally":
+        """Add catch block for specific exception."""
+        handler = ExceptionHandler(
+            exception_type=exception_type,
+            severity=severity,
+            action=action or (lambda e: None),
+            retry_count=retry_count
+        )
+        self.catch_blocks.append(handler)
+        return self
+    
+    def finally_block(self, func: Callable) -> "TryCatchFinally":
+        """Set finally block (always executes)."""
+        self.finally_block = func
+        return self
+    
+    def execute(self) -> Any:
+        """Execute try/catch/finally with retry logic."""
+        try:
+            # Execute try block
+            if self.try_block:
+                self.result = self.try_block()
+            
+        except Exception as e:
+            self.error = e
+            
+            # Find matching catch block
+            for handler in self.catch_blocks:
+                if isinstance(e, handler.exception_type):
+                    # Retry logic
+                    for attempt in range(handler.retry_count + 1):
+                        try:
+                            if attempt > 0:
+                                # Retry attempt
+                                self.result = self.try_block()
+                                self.error = None  # Clear error on success
+                                break
+                            else:
+                                # First attempt already failed, try again
+                                self.result = self.try_block()
+                                self.error = None
+                                break
+                        except Exception as retry_error:
+                            if attempt == handler.retry_count:
+                                # Last attempt failed, execute catch action
+                                self.result = handler.action(retry_error)
+            
+            # No matching catch - re-raise
+            if self.error:
+                raise self.error
+        
+        finally:
+            # Execute finally block
+            if self.finally_block:
+                self.finally_block()
+        
+        return self.result
+
+
+# Example: Safe pattern execution with retries
+def execute_pattern_safely(pattern: dict, context: dict) -> dict:
+    """Execute pattern with error handling."""
+    
+    return TryCatchFinally()\
+        .try_block(lambda: run_pattern(pattern, context))\
+        .catch(TimeoutError, severity=ExceptionSeverity.MEDIUM, 
+               action=lambda e: {"status": "timeout", "error": str(e)}, retry_count=2)\
+        .catch(ValueError, severity=ExceptionSeverity.HIGH,
+               action=lambda e: {"status": "invalid_input", "error": str(e)})\
+        .catch(Exception, severity=ExceptionSeverity.LOW,
+               action=lambda e: {"status": "error", "error": str(e)})\
+        .finally_block(lambda: cleanup_resources())\
+        .execute()
+```
+
+### 5.3 Pipeline Pattern
+
+```python
+# core/control_flow/pipeline.py
+from typing import Callable, Any, List, Optional, TypeVar, Generic
+from dataclasses import dataclass
+from enum import Enum
+
+
+T = TypeVar('T')
+R = TypeVar('R')
+
+
+class PipelineStage(Generic[T, R]):
+    """A stage in a processing pipeline."""
+    name: str
+    transform: Callable[[T], R]
+    condition: Optional[Callable[[T], bool]] = None  # Skip if false
+    
+    def process(self, input_data: T) -> Optional[R]:
+        """Process input through this stage."""
+        # Check condition
+        if self.condition and not self.condition(input_data):
+            return None
+        
+        return self.transform(input_data)
+
+
+@dataclass
+class PipelineResult:
+    """Result of pipeline execution."""
+    output: Any
+    stages_executed: List[str]
+    stages_skipped: List[str]
+    errors: List[dict]
+    duration_ms: float
+
+
+class Pipeline(Generic[T, R]):
+    """
+    Implements pipeline control flow (function composition).
+    
+    Usage:
+        pipeline = Pipeline()
+        pipeline.stage("validate", validate_input)
+        pipeline.stage("transform", transform_data)
+        pipeline.stage("enrich", enrich_data)
+        pipeline.stage("save", save_to_db, condition=lambda x: x.get("valid"))
+        
+        result = pipeline.execute(input_data)
+    """
+    
+    def __init__(self, name: str = "pipeline"):
+        self.name = name
+        self.stages: List[PipelineStage] = []
+    
+    def stage(
+        self,
+        name: str,
+        transform: Callable[[Any], Any],
+        condition: Optional[Callable[[Any], bool]] = None
+    ) -> "Pipeline":
+        """Add a stage to the pipeline."""
+        stage = PipelineStage(
+            name=name,
+            transform=transform,
+            condition=condition
+        )
+        self.stages.append(stage)
+        return self
+    
+    def execute(self, input_data: T) -> PipelineResult:
+        """Execute all stages in sequence."""
+        import time
+        start_time = time.time()
+        
+        current = input_data
+        stages_executed = []
+        stages_skipped = []
+        errors = []
+        
+        for stage in self.stages:
+            try:
+                # Check condition
+                if stage.condition and not stage.condition(current):
+                    stages_skipped.append(stage.name)
+                    continue
+                
+                # Execute stage
+                result = stage.process(current)
+                current = result
+                stages_executed.append(stage.name)
+                
+            except Exception as e:
+                errors.append({
+                    "stage": stage.name,
+                    "error": str(e),
+                    "stage_index": len(stages_executed)
+                })
+                # Continue or break based on error handling
+                # For now, continue pipeline
+        
+        duration_ms = (time.time() - start_time) * 1000
+        
+        return PipelineResult(
+            output=current,
+            stages_executed=stages_executed,
+            stages_skipped=stages_skipped,
+            errors=errors,
+            duration_ms=duration_ms
+        )
+
+
+# Example: Pattern processing pipeline
+def create_pattern_pipeline() -> Pipeline:
+    """Create pattern processing pipeline."""
+    
+    pipeline = Pipeline(name="pattern_processing")
+    
+    # Stage 1: Validate input
+    pipeline.stage(
+        "validate",
+        transform=lambda p: validate_pattern(p),
+        condition=lambda x: x is not None
+    )
+    
+    # Stage 2: Extract features
+    pipeline.stage(
+        "extract_features",
+        transform=lambda p: extract_pattern_features(p)
+    )
+    
+    # Stage 3: Classify domain
+    pipeline.stage(
+        "classify_domain",
+        transform=lambda p: classify_pattern_domain(p)
+    )
+    
+    # Stage 4: Generate embeddings (only if enabled)
+    pipeline.stage(
+        "generate_embedding",
+        transform=lambda p: generate_pattern_embedding(p),
+        condition=lambda p: p.get("generate_embedding", False)
+    )
+    
+    # Stage 5: Save to storage
+    pipeline.stage(
+        "save",
+        transform=lambda p: save_pattern(p),
+        condition=lambda p: p.get("valid", False)
+    )
+    
+    return pipeline
+```
+
+---
+
+## Part 6: Control Flow for Pattern Detection
+
+### 6.1 Pattern Detection via Control Flow Analysis
+
+```python
+# core/control_flow/pattern_detection.py
+from typing import List, Dict, Any, Callable, Optional
+from dataclasses import dataclass
+from enum import Enum
+
+
+class ControlFlowNodeType(Enum):
+    """Types of control flow nodes."""
+    IF = "if"
+    ELSE = "else"
+    FOR = "for"
+    WHILE = "while"
+    SWITCH = "switch"
+    TRY = "try"
+    CALL = "call"  # Function call
+    RETURN = "return"
+    YIELD = "yield"
+
+
+@dataclass
+class ControlFlowNode:
+    """A node in the control flow graph."""
+    node_type: ControlFlowNodeType
+    line_number: int
+    content: str
+    children: List["ControlFlowNode"] = None
+    
+    def __post_init__(self):
+        if self.children is None:
+            self.children = []
+
+
+class ControlFlowDetector:
+    """
+    Detect control flow patterns in code/traces.
+    
+    Maps textual reasoning to control flow structures.
+    """
+    
+    # Keywords that indicate control flow
+    IF_KEYWORDS = ["if", "when", "check", "verify", "should", "conditionally"]
+    ELSE_KEYWORDS = ["else", "otherwise", "otherwise", "fallback", "default"]
+    FOR_KEYWORDS = ["for each", "iterate", "loop", "over", "through"]
+    WHILE_KEYWORDS = ["until", "while", "repeat", "continue until"]
+    SWITCH_KEYWORDS = ["switch", "match", "case", "based on", "depending on"]
+    
+    def detect_from_text(self, text: str) -> List[ControlFlowNode]:
+        """Detect control flow from natural language text."""
+        nodes = []
+        lines = text.split("\n")
+        
+        for i, line in enumerate(lines, 1):
+            line_lower = line.lower().strip()
+            
+            # Detect if statements
+            if any(kw in line_lower for kw in self.IF_KEYWORDS):
+                if "?" in line or "if " in line_lower or "should " in line_lower:
+                    nodes.append(ControlFlowNode(
+                        node_type=ControlFlowNodeType.IF,
+                        line_number=i,
+                        content=line.strip()
+                    ))
+            
+            # Detect else statements
+            elif any(kw in line_lower for kw in self.ELSE_KEYWORDS):
+                nodes.append(ControlFlowNode(
+                    node_type=ControlFlowNodeType.ELSE,
+                    line_number=i,
+                    content=line.strip()
+                ))
+            
+            # Detect loops
+            elif any(kw in line_lower for kw in self.FOR_KEYWORDS):
+                nodes.append(ControlFlowNode(
+                    node_type=ControlFlowNodeType.FOR,
+                    line_number=i,
+                    content=line.strip()
+                ))
+            
+            elif any(kw in line_lower for kw in self.WHILE_KEYWORDS):
+                nodes.append(ControlFlowNode(
+                    node_type=ControlFlowNodeType.WHILE,
+                    line_number=i,
+                    content=line.strip()
+                ))
+            
+            # Detect switch/match
+            elif any(kw in line_lower for kw in self.SWITCH_KEYWORDS):
+                nodes.append(ControlFlowNode(
+                    node_type=ControlFlowNodeType.SWITCH,
+                    line_number=i,
+                    content=line.strip()
+                ))
+        
+        return nodes
+    
+    def detect_from_code(self, code: str) -> List[ControlFlowNode]:
+        """Detect control flow from Python code."""
+        import ast
+        
+        nodes = []
+        
+        try:
+            tree = ast.parse(code)
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.If):
+                    nodes.append(ControlFlowNode(
+                        node_type=ControlFlowNodeType.IF,
+                        line_number=node.lineno,
+                        content=ast.unparse(node.test) if hasattr(ast, 'unparse') else "if condition"
+                    ))
+                
+                elif isinstance(node, ast.For):
+                    nodes.append(ControlFlowNode(
+                        node_type=ControlFlowNodeType.FOR,
+                        line_number=node.lineno,
+                        content=f"for {ast.dump(node.target)} in ..."
+                    ))
+                
+                elif isinstance(node, ast.While):
+                    nodes.append(ControlFlowNode(
+                        node_type=ControlFlowNodeType.WHILE,
+                        line_number=node.lineno,
+                        content="while ..."
+                    ))
+                
+                elif isinstance(node, (ast.Try, ast.ExceptHandler)):
+                    nodes.append(ControlFlowNode(
+                        node_type=ControlFlowNodeType.TRY,
+                        line_number=node.lineno if hasattr(node, 'lineno') else 0,
+                        content="try/except"
+                    ))
+        
+        except SyntaxError:
+            pass
+        
+        return nodes
+
+
+# Example: Analyze reasoning trace for control flow
+def analyze_reasoning_trace(trace: str) -> dict:
+    """Analyze reasoning trace to extract control flow pattern."""
+    
+    detector = ControlFlowDetector()
+    
+    # Try to detect from code first, then text
+    nodes = detector.detect_from_code(trace)
+    if not nodes:
+        nodes = detector.detect_from_text(trace)
+    
+    # Count control flow types
+    from collections import Counter
+    type_counts = Counter(n.node_type.value for n in nodes)
+    
+    return {
+        "total_nodes": len(nodes),
+        "control_flow_types": dict(type_counts),
+        "has_conditionals": ControlFlowNodeType.IF in [n.node_type for n in nodes],
+        "has_loops": any(n.node_type in [ControlFlowNodeType.FOR, ControlFlowNodeType.WHILE] for n in nodes),
+        "has_error_handling": ControlFlowNodeType.TRY in [n.node_type for n in nodes],
+        "complexity_score": len(nodes) + type_counts.get("if", 0) * 2 + type_counts.get("for", 0) * 2
+    }
+```
+
+### 6.2 Enforce Loop Bounds
+
+```python
+# core/control_flow/loop_enforcer.py
+from typing import Callable, Any, List, Optional, TypeVar
+from dataclasses import dataclass
+import time
+
+
+T = TypeVar('T')
+
+
+@dataclass
+class LoopEnforcementResult:
+    """Result of enforced loop execution."""
+    results: List[Any]
+    iterations: int
+    terminated: str  # "max_iterations", "timeout", "condition", "exhausted"
+    duration_ms: float
+
+
+class LoopEnforcer:
+    """
+    Enforce safety bounds on any loop operation.
+    
+    Prevents infinite loops, timeout issues, and resource exhaustion.
+    """
+    
+    def __init__(
+        self,
+        max_iterations: int = 1000,
+        timeout_ms: int = 5000,
+        max_results: int = 10000
+    ):
+        self.max_iterations = max_iterations
+        self.timeout_ms = timeout_ms
+        self.max_results = max_results
+    
+    def enforce_for_loop(
+        self,
+        items: List[T],
+        body: Callable[[T, int], Any]
+    ) -> LoopEnforcementResult:
+        """Execute for loop with enforced bounds."""
+        start_time = time.time()
+        results = []
+        
+        # Check item count
+        if len(items) > self.max_iterations:
+            items = items[:self.max_iterations]
+        
+        for i, item in enumerate(items):
+            # Check timeout
+            elapsed = (time.time() - start_time) * 1000
+            if elapsed > self.timeout_ms:
+                return LoopEnforcementResult(
+                    results=results,
+                    iterations=i,
+                    terminated="timeout",
+                    duration_ms=elapsed
+                )
+            
+            # Check result limit
+            if len(results) >= self.max_results:
+                return LoopEnforcementResult(
+                    results=results,
+                    iterations=i,
+                    terminated="max_results",
+                    duration_ms=elapsed
+                )
+            
+            # Execute body
+            try:
+                result = body(item, i)
+                results.append(result)
+            except Exception as e:
+                # Log but continue
+                results.append({"error": str(e), "index": i})
+        
+        return LoopEnforcementResult(
+            results=results,
+            iterations=len(items),
+            terminated="exhausted",
+            duration_ms=(time.time() - start_time) * 1000
+        )
+    
+    def enforce_while_loop(
+        self,
+        condition: Callable[[int, Any], bool],
+        body: Callable[[int], Any],
+        initial_value: Any = None
+    ) -> LoopEnforcementResult:
+        """Execute while loop with enforced bounds."""
+        start_time = time.time()
+        results = []
+        value = initial_value
+        i = 0
+        
+        while condition(i, value):
+            # Check max iterations
+            if i >= self.max_iterations:
+                return LoopEnforcementResult(
+                    results=results,
+                    iterations=i,
+                    terminated="max_iterations",
+                    duration_ms=(time.time() - start_time) * 1000
+                )
+            
+            # Check timeout
+            elapsed = (time.time() - start_time) * 1000
+            if elapsed > self.timeout_ms:
+                return LoopEnforcementResult(
+                    results=results,
+                    iterations=i,
+                    terminated="timeout",
+                    duration_ms=elapsed
+                )
+            
+            # Execute body
+            try:
+                value = body(i)
+                results.append(value)
+            except Exception as e:
+                results.append({"error": str(e), "iteration": i})
+            
+            i += 1
+        
+        return LoopEnforcementResult(
+            results=results,
+            iterations=i,
+            terminated="condition",
+            duration_ms=(time.time() - start_time) * 1000
+        )
+
+
+# Example: Safe pattern iteration
+def iterate_patterns_safely(
+    patterns: List[dict],
+    processor: Callable[[dict], dict]
+) -> dict:
+    """Iterate over patterns with safety enforcement."""
+    
+    enforcer = LoopEnforcer(max_iterations=100, timeout_ms=5000)
+    
+    result = enforcer.enforce_for_loop(
+        items=patterns,
+        body=lambda p, i: processor(p)
+    )
+    
+    return {
+        "processed": len(result.results),
+        "total_iterations": result.iterations,
+        "terminated": result.terminated,
+        "duration_ms": result.duration_ms,
+        "success_count": len([r for r in result.results if "error" not in r])
+    }
+```
+
+---
+
+## Part 7: Testing Control Flow
+
+### 7.1 Property-Based Testing
+
+```python
+# tests/unit/test_control_flow.py
+import pytest
+from hypothesis import given, strategies as st, settings
+
+
+class TestIfElseControlFlow:
+    """Property-based tests for if/else control flow."""
+    
+    @given(score=st.floats(min_value=0, max_value=1))
+    @settings(max_examples=100)
+    def test_branching_covers_all_cases(self, score):
+        """Every score value should match exactly one branch."""
+        
+        branches_matched = []
+        
+        if_else = IfElseControlFlow()
+        
+        if_else.when(
+            lambda c: c["score"] >= 0.8,
+            lambda c: branches_matched.append("high")
+        )
+        if_else.when(
+            lambda c: 0.5 <= c["score"] < 0.8,
+            lambda c: branches_matched.append("medium")
+        )
+        if_else.when(
+            lambda c: 0.2 <= c["score"] < 0.5,
+            lambda c: branches_matched.append("low")
+        )
+        if_else.otherwise(
+            lambda c: branches_matched.append("minimal")
+        )
+        
+        result = if_else.execute({"score": score})
+        
+        # Should match exactly one branch
+        assert len(branches_matched) == 1
+    
+    def test_empty_branches_returns_unchanged(self):
+        """No branches should return original context."""
+        if_else = IfElseControlFlow()
+        result = if_else.execute({"value": 42})
+        assert result == {"value": 42}
+
+
+class TestWhileLoop:
+    """Tests for while loop convergence."""
+    
+    def test_convergence_detection(self):
+        """Should detect convergence when delta is small."""
+        
+        loop = WhileLoop(
+            initial_value=0.0,
+            condition=lambda v, i: v < 0.99,
+            body=lambda v, i: v + (1 - v) * 0.1
+        ).with_convergence(0.001)
+        
+        result = loop.execute()
+        
+        # Should converge
+        assert result.converged is True
+        assert result.final_value >= 0.99 - 0.001
+    
+    def test_max_iterations_prevents_infinite_loop(self):
+        """Should stop at max iterations."""
+        
+        call_count = [0]
+        
+        loop = WhileLoop(
+            initial_value=0.0,
+            condition=lambda v, i: i < 1000000,  # Would run forever
+            body=lambda v, i: (call_count.__iadd__(1), v + 1)[1]
+        ).with_max_iterations(100)
+        
+        result = loop.execute()
+        
+        assert result.iterations == 100
+        assert call_count[0] == 100
+    
+    def test_timeout_prevents_long_running(self):
+        """Should stop at timeout."""
+        
+        import time
+        
+        loop = WhileLoop(
+            initial_value=0,
+            condition=lambda v, i: True,  # Run forever
+            body=lambda v, i: (time.sleep(0.1), v + 1)[1]
+        ).with_timeout(250)  # 250ms timeout
+        
+        result = loop.execute()
+        
+        # Should stop before 10 iterations (each takes 100ms)
+        assert result.iterations < 10
+
+
+class TestPercentageEvaluator:
+    """Tests for percentage evaluation."""
+    
+    def test_zero_denominator_returns_zero(self):
+        """Zero denominator should return 0 with zero confidence."""
+        
+        evaluator = PercentageEvaluator()
+        result = evaluator.evaluate(5, 0)
+        
+        assert result.value == 0.0
+        assert result.confidence == 0.0
+    
+    def test_bayesian_average_moves_toward_50(self):
+        """Bayesian average should shrink toward 0.5 with small samples."""
+        
+        evaluator = PercentageEvaluator()
+        
+        # With 1 success out of 1 (100%), Bayesian should be less extreme
+        bayesian = evaluator.evaluate(1, 1, method=PercentageMethod.BAYESIAN)
+        
+        # Bayesian should be less than 100%
+        assert bayesian.value < 100.0
+    
+    @given(successes=st.integers(min_value=0, max_value=100),
+           total=st.integers(min_value=1, max_value=100))
+    @settings(max_examples=50)
+    def test_confidence_increases_with_sample_size(self, successes, total):
+        """Confidence should increase with more samples."""
+        
+        evaluator = PercentageEvaluator(min_samples_for_confidence=30)
+        result = evaluator.evaluate(successes, total)
+        
+        # If total >= 30, confidence should be >= 1.0
+        if total >= 30:
+            assert result.confidence == 1.0
+
+
+class TestLoopEnforcer:
+    """Tests for loop enforcement."""
+    
+    def test_enforces_max_iterations(self):
+        """Should stop at max_iterations."""
+        
+        enforcer = LoopEnforcer(max_iterations=10)
+        
+        result = enforcer.enforce_for_loop(
+            items=list(range(100)),
+            body=lambda x, i: x * 2
+        )
+        
+        assert result.iterations == 10
+        assert len(result.results) == 10
+    
+    def test_enforces_timeout(self):
+        """Should stop at timeout."""
+        
+        import time
+        
+        enforcer = LoopEnforcer(timeout_ms=100)
+        
+        result = enforcer.enforce_while_loop(
+            condition=lambda i, v: True,
+            body=lambda i: (time.sleep(0.05), i + 1)[1],
+            initial_value=0
+        )
+        
+        # Should stop before 10 iterations (500ms total)
+        assert result.iterations < 10
+        assert result.terminated == "timeout"
+```
+
+---
+
+## Part 8: Extension Points
+
+### 8.1 Custom Control Flow Patterns
+
+```python
+# core/control_flow/extensions.py
+from typing import Callable, Any, List, Dict
+from dataclasses import dataclass
+
+
+class ControlFlowBuilder:
+    """
+    Builder for composing custom control flow patterns.
+    """
+    
+    def __init__(self):
+        self.primitives: List[Dict[str, Any]] = []
+    
+    def add_branch(self, condition: Callable, action: Callable) -> "ControlFlowBuilder":
+        """Add a branch primitive."""
+        self.primitives.append({
+            "type": "branch",
+            "condition": condition,
+            "action": action
+        })
+        return self
+    
+    def add_loop(
+        self,
+        condition: Callable,
+        body: Callable,
+        max_iterations: int = None
+    ) -> "ControlFlowBuilder":
+        """Add a loop primitive."""
+        self.primitives.append({
+            "type": "loop",
+            "condition": condition,
+            "body": body,
+            "max_iterations": max_iterations
+        })
+        return self
+    
+    def add_transform(self, transform: Callable) -> "ControlFlowBuilder":
+        """Add a transformation primitive."""
+        self.primitives.append({
+            "type": "transform",
+            "function": transform
+        })
+        return self
+    
+    def build(self) -> Callable[[Any], Any]:
+        """Build the composed control flow."""
+        
+        def composed(input_data: Any) -> Any:
+            current = input_data
+            
+            for primitive in self.primitives:
+                if primitive["type"] == "branch":
+                    if primitive["condition"](current):
+                        current = primitive["action"](current)
+                
+                elif primitive["type"] == "loop":
+                    iterations = 0
+                    max_iter = primitive.get("max_iterations", 1000)
+                    
+                    while primitive["condition"](current) and iterations < max_iter:
+                        current = primitive["body"](current)
+                        iterations += 1
+                
+                elif primitive["type"] == "transform":
+                    current = primitive["function"](current)
+            
+            return current
+        
+        return composed
+
+
+# Example: Build custom pattern detection flow
+def create_detection_flow() -> Callable:
+    """Create custom control flow for pattern detection."""
+    
+    builder = ControlFlowBuilder()
+    
+    # 1. Filter invalid inputs
+    builder.add_branch(
+        condition=lambda x: x is not None and "text" in x,
+        action=lambda x: x
+    )
+    
+    # 2. Extract control flow
+    builder.add_transform(
+        transform=lambda x: detect_control_flow(x["text"])
+    )
+    
+    # 3. Loop until stable
+    builder.add_loop(
+        condition=lambda x: x.get("confidence", 0) < 0.9,
+        body=lambda x: refine_detection(x),
+        max_iterations=10
+    )
+    
+    return builder.build()
+```
