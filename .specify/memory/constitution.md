@@ -1,16 +1,18 @@
 <!--
   Sync Impact Report
   ===================
-  Version change: 1.2.0 → 1.2.1 (patch update - added Z3 SMT solver for formal verification)
+  Version change: 1.2.0 → 1.2.1 (patch update - added Z3 SMT solver for formal verification and everyday reasoning)
 
   Added capabilities:
     - Z3 SMT Solver added to Technical Stack as verification tool
     - Principle II enhanced to include formal verification via Z3 for pattern correctness
     - Z3 can prove constraint satisfaction (FSM invariants, guard conditions, control flow safety)
+    - **Vision**: Z3 enables verification of reasoning patterns covering ~80% of 80% of people's daily problem-solving needs
+      (deduction, induction, constraint satisfaction across mathematics, programs, protocols, systems, invariants)
 
   Modified sections:
-    - Principle II (Verification Before Learning): Added Z3 as formal verification mechanism
-    - Technical Stack: Added "Verification Tools: Z3 SMT Solver"
+    - Principle II (Verification Before Learning): Added Z3 as formal verification mechanism + everyday reasoning rationale
+    - Technical Stack: Added "Verification Tools: Z3 SMT Solver" with vision statement and capabilities
 
   Removed sections: None
 
@@ -23,9 +25,10 @@
 
   Follow-up TODOs:
     - Document Z3 verification patterns for FSM state invariants
-    - Create Z3 proof templates for common guard conditions
+    - Create Z3 proof templates for common guard conditions and everyday reasoning patterns
     - Integrate Z3 verification into pattern promotion pipeline (optional gate)
     - Add Z3 verification examples to pattern extraction spec (005)
+    - Catalog common reasoning patterns (80/80 target) that Z3 can verify
 -->
 
 # Grimoire Constitution
@@ -74,6 +77,11 @@ Non-negotiable rules:
   satisfaction (e.g., FSM state invariants, guard conditions, control
   flow safety bounds). When Z3 provides a proof, the pattern is
   considered formally verified.
+- **Z3 for Everyday Reasoning**: Z3's SMT capabilities (deduction,
+  induction, constraint satisfaction) enable verification of reasoning
+  patterns that address ~80% of 80% of daily problem-solving needs.
+  This includes: mathematical proofs, program correctness, protocol
+  verification, system invariants, and logical consistency checks.
 
 **Rationale**: A system that learns from hallucinations compounds
 errors exponentially. Verification is the only defense against
@@ -311,6 +319,9 @@ The following technical decisions are architectural constraints:
 - **Vector Database**: Qdrant >= 1.7 (or compatible with payload filtering)
 - **Embedding Models**: Configurable; version tracking REQUIRED; reproducibility MUST be ensured across model updates
 - **Verification Tools**: Z3 SMT Solver (for formal verification of pattern correctness and constraint satisfaction)
+  - **Z3 Vision**: SMT solving enables deductive, inductive, and constraint-based reasoning that addresses ~80% of 80% of people's daily problem-solving needs (mathematics, programs, protocols, systems, invariants)
+  - Z3 provides guarantees: proves whether constraints are consistent, produces concrete models when satisfiable, proves unsatisfiability when no solution exists
+  - Theories supported: integers, reals, bit-vectors, arrays, sets, algebraic data types, uninterpreted functions, quantifiers (∀, ∃)
 - **ID Strategy**: ULID or ULID-like (composite: deterministic base + UUID suffix for dedup)
 - **Text Storage**: S3/GCS for externalized markdown with versioning
 - **FSM Architecture**: 10 universal FSMs (see Principle XI)
