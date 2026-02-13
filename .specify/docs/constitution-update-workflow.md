@@ -11,7 +11,8 @@ Run the audit script to check if all docs are referenced:
 ```
 
 Expected output if up to date:
-```
+
+```text
 ✅ All docs/ files are referenced in constitution!
 ```
 
@@ -58,6 +59,7 @@ Edit [.specify/memory/constitution.md](.specify/memory/constitution.md):
 ```
 
 **Guidelines:**
+
 - Place in appropriate section based on content type
 - Add descriptive summary (10-20 words) after the em-dash
 - Maintain alphabetical or logical ordering within section
@@ -119,6 +121,7 @@ git commit -m 'constitution: v1.x.y - brief description
 **Recommended frequency:** Quarterly or before major releases
 
 **Checklist:**
+
 1. Run audit script
 2. Review any new docs/ files added since last audit
 3. Update constitution if needed
@@ -164,13 +167,14 @@ $ git commit -m 'constitution: v1.2.2 - add PRD documentation'
 ## Troubleshooting
 
 **Issue:** Script shows unreferenced but file is in constitution
+
 - Check that file path uses exact relative path format
 - Ensure markdown link syntax: `[Title](../../docs/path/file.md)`
 - No spaces or extra characters in path
 
 **Issue:** Can't determine which section for new doc
+
 - Read full doc to understand purpose
 - Look for similar existing docs in constitution
 - When in doubt: place in Vision & Strategy or Reference Documentation
 - Ask in PR review for section placement feedback
-
