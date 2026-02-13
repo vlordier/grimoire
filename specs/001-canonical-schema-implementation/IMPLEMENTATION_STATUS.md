@@ -10,6 +10,7 @@
 ## 🎯 MVP Scope Completion
 
 ### Story 1: Ingest HuggingFace Dataset (P1)
+
 **Status**: ✅ **IMPLEMENTED & TESTED**
 
 | Task | Title | Status | Files |
@@ -24,6 +25,7 @@
 | T-010 | Benchmark 1.2M traces | ✅ Done | (test framework in place) |
 
 **Capabilities Delivered**:
+
 - ✅ Parse HuggingFace OpenThoughts datasets (114K and 1.2M variants)
 - ✅ Normalize to canonical Trace + Step format
 - ✅ Generate composite trace IDs with deduplication
@@ -39,6 +41,7 @@
 ---
 
 ### Story 2: Store Graph in Neo4j (P1)
+
 **Status**: ✅ **IMPLEMENTED & TESTED**
 
 | Task | Title | Status | Files |
@@ -54,6 +57,7 @@
 | T-019 | E2E Neo4j test | ✅ Done | `tests/integration/test_neo4j_fullstack.py` |
 
 **Capabilities Delivered**:
+
 - ✅ Persistent graph storage in Neo4j 5.x
 - ✅ Uniqueness constraints on trace_id and step_id
 - ✅ Performance indexes on domain, FSM, role
@@ -69,6 +73,7 @@
 ---
 
 ### Story 3: Store Embeddings in Qdrant (P1)
+
 **Status**: ✅ **IMPLEMENTED & TESTED**
 
 | Task | Title | Status | Files |
@@ -81,6 +86,7 @@
 | T-025 | E2E Qdrant test | ✅ Done | `tests/integration/test_qdrant_fullstack.py` |
 
 **Capabilities Delivered**:
+
 - ✅ Configurable embedding models (default: all-MiniLM-L6-v2, 384 dims)
 - ✅ Version binding of embeddings to text versions
 - ✅ Staleness tracking for modified text
@@ -111,6 +117,7 @@
 ## Files Created/Modified
 
 ### New Files (9 created)
+
 1. `src/grimoire/ingestion/hf_loader.py` - HuggingFace dataset loading
 2. `src/grimoire/ingestion/validator.py` - Schema validation
 3. `src/grimoire/logging_setup.py` - Structured logging
@@ -122,6 +129,7 @@
 9. `tests/integration/test_qdrant_fullstack.py` - Qdrant tests
 
 ### Enhanced Files (2 modified)
+
 1. `src/grimoire/storage/neo4j.py` - Complete persistence layer
 2. `pyproject.toml` - Package configuration
 
@@ -130,6 +138,7 @@
 ## Deployment Readiness
 
 ### Prerequisites for Running Integration Tests
+
 ```bash
 # Requirements already specified in requirements.txt
 # To run tests, start these services:
@@ -147,6 +156,7 @@ pytest tests/integration/test_qdrant_fullstack.py -v   # Story 3
 ```
 
 ### Configuration Parameters
+
 ```python
 # Ingestion
 ingestion_config = IngestionConfig(
@@ -205,10 +215,12 @@ qdrant = QdrantStorage(
 ## What's Next (Phase 2)
 
 ### Not in MVP (P2 tasks):
+
 - [ ] T-026: Comprehensive schema validation test suite
 - [ ] T-027: Enhanced provenance tracking and compliance reporting
 
 ### Deferred to Phase 2+:
+
 - S3 markdown text versioning (FR-013)
 - Step window context grouping (FR-015)
 - Advanced danger signal filtering (FR-016)  
@@ -216,6 +228,7 @@ qdrant = QdrantStorage(
 - API versioning
 
 ### Phase 2 will focus on:
+
 1. Implementation automation via /speckit.implement
 2. Scale testing with full 1.2M dataset
 3. Pattern extraction from parsed traces
@@ -226,7 +239,7 @@ qdrant = QdrantStorage(
 
 ## Git History
 
-```
+```text
 e9ae708 - feat(001): implement full MVP - ingestion, Neo4j, Qdrant storage
 61553e7 - fix: correct schema references and test assertions
 17af725 - feat(001): implement ingestion parser and storage layer
