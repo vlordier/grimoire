@@ -1,34 +1,28 @@
 <!--
   Sync Impact Report
   ===================
-  Version change: 1.2.0 → 1.2.1 (patch update - added Z3 SMT solver for formal verification and everyday reasoning)
+  Version change: 1.2.1 → 1.2.2 (patch update - added missing PRD documentation references)
 
-  Added capabilities:
-    - Z3 SMT Solver added to Technical Stack as verification tool
-    - Principle II enhanced to include formal verification via Z3 for pattern correctness
-    - Z3 can prove constraint satisfaction (FSM invariants, guard conditions, control flow safety)
-    - **Vision**: Z3 enables verification of reasoning patterns covering ~80% of 80% of people's daily problem-solving needs
-      (deduction, induction, constraint satisfaction across mathematics, programs, protocols, systems, invariants)
+  Added documentation:
+    - docs/vision/prd-executive.md: 1-page executive summary with product positioning
+    - docs/vision/prd.md: Full product requirements with target users, use cases, success metrics
 
   Modified sections:
-    - Principle II (Verification Before Learning): Added Z3 as formal verification mechanism + everyday reasoning rationale
-    - Technical Stack: Added "Verification Tools: Z3 SMT Solver" with vision statement and capabilities
+    - Reference Documentation → Vision & Strategy: Added PRD files (now 6 docs in Vision section)
 
   Removed sections: None
 
-  Previous version summary (v1.2.0):
-    - Added Principles XI (Domain Knowledge Foundation) and XII (Operational Specifications)
-    - Comprehensive docs/ integration (23 files referenced)
-    - 40+ cross-references to domain knowledge, architecture, and operational specs
+  Previous version summary (v1.2.1):
+    - Z3 SMT Solver added for formal verification and everyday reasoning (~80% of 80% coverage)
+    - Enhanced Principle II with Z3 capabilities and vision statement
+    - Added Z3 to Technical Stack with supported theories
 
-  Impact on templates: None (Z3 is optional verification tool, not a requirement)
+  Impact on templates: None (documentation reference only)
 
   Follow-up TODOs:
-    - Document Z3 verification patterns for FSM state invariants
-    - Create Z3 proof templates for common guard conditions and everyday reasoning patterns
-    - Integrate Z3 verification into pattern promotion pipeline (optional gate)
-    - Add Z3 verification examples to pattern extraction spec (005)
-    - Catalog common reasoning patterns (80/80 target) that Z3 can verify
+    - Set up quarterly audit process to check for new docs/ files
+    - Create automated script to detect unreferenced docs
+    - Document PRD-to-constitution principle mapping
 -->
 
 # Grimoire Constitution
@@ -381,6 +375,8 @@ This constitution is grounded in the following authoritative specifications and 
 
 ### Vision & Strategy
 
+- [PRD Executive Summary](../../docs/vision/prd-executive.md) — 1-page overview: what Grimoire is/isn't, core capabilities, target users
+- [Product Requirements Document](../../docs/vision/prd.md) — Full PRD: problem statement, product vision, use cases, success metrics
 - [System Specification](../../docs/vision/spec.md) — High-level system overview
 - [System Architecture](../../docs/architecture/system-architecture.md) — Component diagram and data flows
 - [Build Plan](../../docs/architecture/build-plan.md) — Phased implementation roadmap (Phase 0–6)
