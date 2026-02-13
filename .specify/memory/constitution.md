@@ -1,35 +1,31 @@
 <!--
   Sync Impact Report
   ===================
-  Version change: 1.1.0 → 1.2.0 (minor update - domain knowledge + operational specs codified)
+  Version change: 1.2.0 → 1.2.1 (patch update - added Z3 SMT solver for formal verification)
 
-  Added principles:
-    - XI. Domain Knowledge Foundation (15 problem archetypes + 10 FSMs + 4 danger types + control patterns)
-    - XII. Operational Specifications (multi-tenancy, API versioning, auth, export/import, control flow, disaster recovery, Neo4j migration, integration tests)
+  Added capabilities:
+    - Z3 SMT Solver added to Technical Stack as verification tool
+    - Principle II enhanced to include formal verification via Z3 for pattern correctness
+    - Z3 can prove constraint satisfaction (FSM invariants, guard conditions, control flow safety)
 
   Modified sections:
-    - Core Principles (expanded from 10 to 12 principles)
-    - Technical Stack (linked to canonical schemas + storage mapping + problem classification)
-    - Quality Gates (added domain alignment + operational spec compliance checks)
-    - Development Workflow (added documentation integration requirement)
-    - Added comprehensive Reference Documentation hub (23 docs/ files listed)
+    - Principle II (Verification Before Learning): Added Z3 as formal verification mechanism
+    - Technical Stack: Added "Verification Tools: Z3 SMT Solver"
 
   Removed sections: None
 
-  Impact on templates:
-    ✅ .specify/templates/plan-template.md
-       — Constitution Check section now references Principles XI-XII
-    ✅ .specify/templates/spec-template.md
-       — Already compatible; specs now cross-reference domain docs
-    ✅ .specify/templates/tasks-template.md
-       — Task phases align with all 12 principles
-    ✅ Feature specs (001-008)
-       — All now include Documentation Integration sections
+  Previous version summary (v1.2.0):
+    - Added Principles XI (Domain Knowledge Foundation) and XII (Operational Specifications)
+    - Comprehensive docs/ integration (23 files referenced)
+    - 40+ cross-references to domain knowledge, architecture, and operational specs
+
+  Impact on templates: None (Z3 is optional verification tool, not a requirement)
 
   Follow-up TODOs:
-    - Validate all 8 feature specs against Principles XI-XII (domain alignment check)
-    - Create domain knowledge induction tests for all FSM types
-    - Create benchmark suite (200-500 prompts) aligned with 15 problem archetypes
+    - Document Z3 verification patterns for FSM state invariants
+    - Create Z3 proof templates for common guard conditions
+    - Integrate Z3 verification into pattern promotion pipeline (optional gate)
+    - Add Z3 verification examples to pattern extraction spec (005)
 -->
 
 # Grimoire Constitution
@@ -66,18 +62,23 @@ Learning from unverified outputs is the worst failure mode.
 Non-negotiable rules:
 
 - Before declaring success, the system MUST check correctness via
-  tests, mathematical substitution, output validation, or equivalent
-  evidence.
+  tests, mathematical substitution, output validation, formal
+  verification (Z3 SMT solver), or equivalent evidence.
 - Every outcome that feeds into recipe improvement MUST have a
   verification trace logged alongside it.
 - Unverified outputs MUST NOT update recipe confidence scores,
   propose recipe amendments, or enter shared memory.
 - Verification failures MUST be logged with sufficient context for
   post-mortem analysis.
+- **For pattern correctness**: Z3 MAY be used to prove constraint
+  satisfaction (e.g., FSM state invariants, guard conditions, control
+  flow safety bounds). When Z3 provides a proof, the pattern is
+  considered formally verified.
 
 **Rationale**: A system that learns from hallucinations compounds
 errors exponentially. Verification is the only defense against
-reasoning drift.
+reasoning drift. Formal verification via Z3 provides mathematical
+guarantees for critical patterns.
 
 ### III. Federated Quality Control
 
@@ -309,6 +310,7 @@ The following technical decisions are architectural constraints:
 - **Graph Database**: Neo4j 5.x (or compatible property graph DB per migration guide)
 - **Vector Database**: Qdrant >= 1.7 (or compatible with payload filtering)
 - **Embedding Models**: Configurable; version tracking REQUIRED; reproducibility MUST be ensured across model updates
+- **Verification Tools**: Z3 SMT Solver (for formal verification of pattern correctness and constraint satisfaction)
 - **ID Strategy**: ULID or ULID-like (composite: deterministic base + UUID suffix for dedup)
 - **Text Storage**: S3/GCS for externalized markdown with versioning
 - **FSM Architecture**: 10 universal FSMs (see Principle XI)

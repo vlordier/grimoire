@@ -193,7 +193,7 @@ A compliance officer wants every ingested trace to include provenance (source, l
 
 ## Constitution Compliance Check
 
-**Constitution Version**: 1.1.0
+**Constitution Version**: 1.2.1
 
 This feature implements:
 
@@ -202,6 +202,7 @@ This feature implements:
 - ✅ **Principle VIII**: Provenance and Licensing (full metadata tracking)
 - ✅ **Principle V**: Test-First Development (TDD workflow planned in tasks.md)
 - ⚠️ **Principle IX**: Privacy and Safety (PII scrubbing deferred to future feature; sensitivity labeling only)
+- 🔬 **Principle II**: Verification Before Learning (Z3 SMT solver available for formal verification of schema constraints and FSM transition guards when needed)
 
 **Quality Gates Applied**:
 
@@ -210,6 +211,7 @@ This feature implements:
 3. Schema Validation (automated on every record)
 4. Provenance Check (required metadata enforced)
 5. Benchmark Validation (ingestion performance tracked)
+6. **Optional: Z3 Formal Verification** (for proving constraint satisfaction in complex schema invariants; e.g., FSM state consistency, edge uniqueness guarantees)
 
 ## Summary: Clarification Outcomes
 

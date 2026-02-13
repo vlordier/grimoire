@@ -135,6 +135,7 @@ Build a feedback loop system that tracks pattern effectiveness, detects concept 
    - Statistical testing: t-test, KL divergence
    - Auto-promotion when p < 0.05
    - If inconclusive, keep version_a and continue until significance or timeout
+   - **Optional: Z3 Formal Verification** — Before promoting version_b, optionally verify pattern correctness using Z3 SMT solver to prove constraint satisfaction (e.g., FSM transition guards, control flow safety bounds). If Z3 provides a proof, the pattern is considered formally verified in addition to statistically validated.
 
 5. **Pattern Lifecycle**
    - Version management: pattern → [v1, v2, v3...]
