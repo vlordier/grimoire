@@ -18,6 +18,7 @@ This document defines the comprehensive disaster recovery (DR) strategy for Grim
 5. **Natural disasters** - Regional outages requiring geo-failover
 
 **Recovery Objectives**:
+
 - **RPO (Recovery Point Objective)**: 1 hour (max data loss)
 - **RTO (Recovery Time Objective)**: 4 hours (max downtime)
 - **RTO (Critical path)**: 30 minutes (core ingestion)
@@ -110,26 +111,26 @@ import json
 
 class QdrantBackup:
     """Qdrant vector store backup manager."""
-    
+
     def __init__(self, qdrant_host: str, s3_bucket: str):
         self.client = qdrant_client.QdrantClient(host=qdrant_host)
         self.s3 = boto3.client('s3')
         self.bucket = s3_bucket
-    
+
     def backup_collection(self, collection_name: str) -> dict:
         """Create snapshot of Qdrant collection."""
-        
+
         # Create snapshot
         snapshot_info = self.client.create_snapshot(
             collection_name=collection_name,
             wait=True
         )
-        
+
         snapshot_path = snapshot_info.snapshot_path
-        
+
         # Upload to S3
         s3_key = f"qdrant/{collection_name}/{datetime.utcnow().isoformat()}.snapshot"
-        
+
         self.s3.upload_file(
             snapshot_path,
             self.bucket,
@@ -143,45 +144,45 @@ class QdrantBackup:
                 }
             }
         )
-        
+
         return {
             "collection": collection_name,
             "s3_key": s3_key,
             "snapshot_path": snapshot_path,
             "timestamp": datetime.utcnow().isoformat()
         }
-    
+
     def backup_all_collections(self) -> List[dict]:
         """Backup all Qdrant collections."""
         collections = self.client.get_collections().collections
-        
+
         backups = []
         for collection in collections:
             backup = self.backup_collection(collection.name)
             backups.append(backup)
-        
+
         return backups
-    
+
     def restore_collection(self, collection_name: str, s3_key: str):
         """Restore collection from S3."""
-        
+
         # Download from S3
         local_path = f"/tmp/{collection_name}.snapshot"
         self.s3.download_file(self.bucket, s3_key, local_path)
-        
+
         # Delete existing collection if exists
         try:
             self.client.delete_collection(collection_name)
         except:
             pass
-        
+
         # Restore from snapshot
         self.client.recover_snapshot(
             collection_name=collection_name,
             snapshot_path=local_path,
             wait=True
         )
-        
+
         return {"status": "restored", "collection": collection_name}
 ```
 
@@ -289,20 +290,20 @@ import subprocess
 
 class PointInTimeRecovery:
     """Point-in-time recovery for Neo4j."""
-    
+
     def __init__(self, s3_bucket: str):
         self.s3_bucket = s3_bucket
-    
+
     def find_closest_backup(self, target_time: datetime) -> dict:
         """Find closest backup to target time."""
-        
+
         # List all backups
         result = subprocess.run(
             ["aws", "s3", "ls", f"s3://{self.s3_bucket}/neo4j/"],
             capture_output=True,
             text=True
         )
-        
+
         backups = []
         for line in result.stdout.split('\n'):
             if 'neo4j_backup_' in line:
@@ -313,28 +314,28 @@ class PointInTimeRecovery:
                     'time': backup_time,
                     'key': parts[-1]
                 })
-        
+
         # Find closest
         closest = min(backups, key=lambda x: abs(x['time'] - target_time))
         return closest
-    
+
     def recover_to_point(self, target_time: datetime):
         """Recover database to specific point in time."""
-        
+
         # Find closest backup
         backup = self.find_closest_backup(target_time)
         print(f"Using backup from: {backup['time']}")
-        
+
         # Restore full backup
         s3_path = f"s3://{self.s3_bucket}/neo4j/{backup['key']}"
         subprocess.run(['./scripts/recovery/neo4j_restore.sh', s3_path], check=True)
-        
+
         # Apply incremental logs if needed
         if backup['time'] < target_time:
             self._apply_incremental_logs(backup['time'], target_time)
-        
+
         return {'status': 'recovered', 'target_time': target_time}
-    
+
     def _apply_incremental_logs(self, from_time: datetime, to_time: datetime):
         """Apply incremental transaction logs."""
         # Implementation depends on Neo4j incremental backup setup
@@ -347,7 +348,7 @@ class PointInTimeRecovery:
 
 ### Multi-Region Setup
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         MULTI-REGION ARCHITECTURE                        │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -469,7 +470,7 @@ echo "FAILOVER COMPLETE"
 
 class CorruptionRecovery:
     """Handle data corruption scenarios."""
-    
+
     def detect_corruption(self) -> dict:
         """Run corruption detection checks."""
         checks = {
@@ -478,12 +479,12 @@ class CorruptionRecovery:
             'invalid_properties': self._check_invalid_properties(),
             'schema_violations': self._check_schema_violations()
         }
-        
+
         return {
             'corruption_detected': any(checks.values()),
             'details': checks
         }
-    
+
     def _check_orphaned_nodes(self) -> bool:
         """Check for nodes without required relationships."""
         result = neo4j_query("""
@@ -492,20 +493,20 @@ class CorruptionRecovery:
             RETURN count(s) as orphaned
         """)
         return result['orphaned'] > 0
-    
+
     def repair_corruption(self, corruption_report: dict):
         """Attempt to repair corruption."""
-        
+
         if corruption_report['details']['orphaned_nodes']:
             # Option 1: Delete orphaned nodes
             # Option 2: Reconnect to dummy trace
             # Option 3: Restore from backup
             pass
-        
+
         if corruption_report['details']['broken_relationships']:
             # Repair relationships
             pass
-    
+
     def restore_from_backup(self, backup_time: datetime):
         """Full restore from backup."""
         # Stop services
@@ -539,55 +540,55 @@ from datetime import datetime
 
 class TestBackupRestore:
     """Test disaster recovery procedures."""
-    
+
     def test_neo4j_backup_integrity(self):
         """Verify Neo4j backup can be restored."""
         # Create test data
         test_data = create_test_data()
-        
+
         # Take backup
         backup_path = neo4j_backup()
-        
+
         # Corrupt current data (simulate failure)
         neo4j_query("MATCH (n:Test) DELETE n")
-        
+
         # Restore from backup
         neo4j_restore(backup_path)
-        
+
         # Verify data restored
         restored = neo4j_query("MATCH (n:Test) RETURN count(n) as count")
         assert restored['count'] == len(test_data)
-    
+
     def test_qdrant_snapshot_restore(self):
         """Verify Qdrant snapshot restore."""
         # Create collection
         collection = "test_collection"
         create_test_vectors(collection)
-        
+
         # Create snapshot
         snapshot = qdrant_backup(collection)
-        
+
         # Delete collection
         qdrant_client.delete_collection(collection)
-        
+
         # Restore
         qdrant_restore(snapshot)
-        
+
         # Verify
         assert qdrant_client.collection_exists(collection)
-    
+
     def test_failover_procedure(self):
         """Test automated failover."""
         # Simulate primary failure
         stop_neo4j_primary()
-        
+
         # Wait for failover
         time.sleep(60)
-        
+
         # Verify secondary promoted
         new_primary = get_neo4j_primary()
         assert new_primary != original_primary
-        
+
         # Verify services responding
         response = requests.get("http://api.grimoire.local/health")
         assert response.status_code == 200
@@ -645,7 +646,7 @@ groups:
           severity: critical
         annotations:
           summary: "Backup is stale (>25 hours)"
-      
+
       - alert: ReplicationLagHigh
         expr: grimoire_replication_lag_seconds > 300  # 5 minutes
         for: 5m
@@ -653,7 +654,7 @@ groups:
           severity: warning
         annotations:
           summary: "Replication lag > 5 minutes"
-      
+
       - alert: DRDrillOverdue
         expr: time() - grimoire_last_dr_drill_timestamp > 7776000  # 90 days
         for: 0m
