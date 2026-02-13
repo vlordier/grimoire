@@ -112,14 +112,14 @@ class APIVersionInfo(BaseModel):
     sunset_at: Optional[datetime] = None
     docs_url: str
     changelog_url: str
-    
+
     class Config:
         use_enum_values = True
 
 
 class VersionConfig:
     """Configuration for API versioning."""
-    
+
     # Version registry
     VERSIONS: Dict[str, APIVersionInfo] = {
         "v1": APIVersionInfo(
@@ -146,13 +146,13 @@ class VersionConfig:
             changelog_url="https://docs.grimoire.ai/v1alpha/changelog"
         ),
     }
-    
+
     # Default version for clients not specifying
     DEFAULT_VERSION = "v1"
-    
+
     # Supported versions (excludes sunset)
     SUPPORTED_VERSIONS = ["v1", "v1beta"]
-    
+
     # Deprecation settings
     DEPRECATION_WARNING_HEADER = "Deprecation"
     DEPRECATION_SUNSET_HEADER = "Sunset"
@@ -161,38 +161,38 @@ class VersionConfig:
 
 class VersionMiddleware:
     """Middleware to handle API version extraction and validation."""
-    
+
     def __init__(self, app, config: VersionConfig):
         self.app = app
         self.config = config
-    
+
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        
+
         # Extract version from path
         path = scope.get("path", "/")
         version = self._extract_version(path)
-        
+
         # Validate version
         if version and version not in self.config.VERSIONS:
             await self._send_error(send, "Unsupported API version")
             return
-        
+
         # Add version to scope for handlers
         scope["api_version"] = version or self.config.DEFAULT_VERSION
-        
+
         # Process request
         await self.app(scope, receive, send)
-    
+
     def _extract_version(self, path: str) -> Optional[str]:
         """Extract version from URL path."""
         parts = path.strip("/").split("/")
         if parts and parts[0].startswith("v"):
             return parts[0]
         return None
-    
+
     async def _send_error(self, send, message: str, status: int = 400):
         """Send error response."""
         # Implementation for error response
@@ -201,16 +201,16 @@ class VersionMiddleware:
 
 class VersionedRouter:
     """Router that supports multiple API versions."""
-    
+
     def __init__(self, prefix: str = "", config: VersionConfig = None):
         self.prefix = prefix
         self.config = config or VersionConfig()
         self.routers: Dict[str, APIRouter] = {}
-        
+
         # Create router for each version
         for version in self.config.SUPPORTED_VERSIONS:
             self.routers[version] = APIRouter(prefix=f"/{version}{prefix}")
-    
+
     def add_route(
         self,
         path: str,
@@ -220,11 +220,11 @@ class VersionedRouter:
     ):
         """Add route to specified version(s)."""
         versions = [version] if version else self.config.SUPPORTED_VERSIONS
-        
+
         for v in versions:
             if v in self.routers:
                 self.routers[v].add_api_route(path, endpoint, methods=methods)
-    
+
     def get_router(self, version: str) -> APIRouter:
         """Get router for specific version."""
         return self.routers.get(version, self.routers[self.config.DEFAULT_VERSION])
@@ -266,37 +266,37 @@ class DeprecationInfo(BaseModel):
     id: str
     type: DeprecationType
     severity: DeprecationSeverity
-    
+
     # What is deprecated
     endpoint: Optional[str] = None
     field: Optional[str] = None
     parameter: Optional[str] = None
-    
+
     # Timeline
     announced_at: datetime
     deprecated_at: datetime
     sunset_at: datetime
-    
+
     # Migration guidance
     replacement: Optional[str] = None
     migration_guide_url: Optional[str] = None
     alternative: Optional[str] = None
-    
+
     class Config:
         use_enum_values = True
 
 
 class DeprecationManager:
     """Manage API deprecations and communicate to clients."""
-    
+
     def __init__(self, config: VersionConfig):
         self.config = config
         self.deprecations: Dict[str, DeprecationInfo] = {}
-    
+
     def register_deprecation(self, deprecation: DeprecationInfo):
         """Register a new deprecation."""
         self.deprecations[deprecation.id] = deprecation
-    
+
     def get_active_deprecations(self) -> List[DeprecationInfo]:
         """Get all currently active deprecations."""
         now = datetime.utcnow()
@@ -304,7 +304,7 @@ class DeprecationManager:
             d for d in self.deprecations.values()
             if d.deprecated_at <= now < d.sunset_at
         ]
-    
+
     def check_deprecation(
         self,
         version: str,
@@ -321,7 +321,7 @@ class DeprecationManager:
                     return deprecation
                 return deprecation
         return None
-    
+
     def get_deprecation_headers(
         self,
         deprecation: DeprecationInfo
@@ -329,7 +329,7 @@ class DeprecationManager:
         """Generate deprecation headers per RFC 8594."""
         now = datetime.utcnow()
         days_until_sunset = (deprecation.sunset_at - now).days
-        
+
         return {
             "Deprecation": f" {deprecation.endpoint}",
             "Sunset": deprecation.sunset_at.strftime("%a, %d %b %Y %H:%M:%S GMT"),
@@ -404,21 +404,21 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 class VersionHeadersMiddleware(BaseHTTPMiddleware):
     """Add API version headers to all responses."""
-    
+
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        
+
         # Add version header
         version = request.scope.get("api_version", "v1")
         response.headers["X-API-Version"] = version
         response.headers["X-API-Version-Latest"] = "v1"
-        
+
         # Add deprecation warnings if applicable
         deprecation = getattr(request.state, "deprecation", None)
         if deprecation:
             response.headers["Deprecation"] = f"true"
             response.headers["Sunset"] = deprecation.sunset_at.isoformat()
-        
+
         return response
 
 
@@ -448,12 +448,12 @@ from fastapi import Header, HTTPException
 
 class VersionNegotiator:
     """Handle client version selection."""
-    
+
     # Priority order for version selection
     # 1. Path (most explicit)
     # 2. Accept-Version header
     # 3. Default to latest stable
-    
+
     @staticmethod
     def negotiate_version(
         accept_version: Optional[str] = Header(None, alias="Accept-Version"),
@@ -461,7 +461,7 @@ class VersionNegotiator:
     ) -> str:
         """
         Negotiate API version with client.
-        
+
         Client can specify version via:
         1. URL path: /v1/patterns
         2. Accept-Version header: Accept-Version: v1
@@ -469,7 +469,7 @@ class VersionNegotiator:
         # Path takes precedence
         if api_version:
             return api_version
-        
+
         # Accept-Version header
         if accept_version:
             # Handle version ranges
@@ -480,7 +480,7 @@ class VersionNegotiator:
                 # Handle loose matching
                 if accept_version.startswith("v1"):
                     return "v1"
-        
+
         # Default
         return "v1"
 
@@ -547,7 +547,7 @@ def version_availability_header(supported_versions: List[str]) -> dict:
 async def get_api_versions():
     """
     Get all available API versions.
-    
+
     Returns:
         - supported: List of actively supported versions
         - deprecated: List of deprecated versions (still functional)
@@ -589,7 +589,7 @@ async def get_api_versions():
 
 ### v1 to v2 Migration
 
-```markdown
+````markdown
 # Migration Guide: v1 → v2
 
 ## Breaking Changes
@@ -602,9 +602,10 @@ async def get_api_versions():
   "patterns": [...],
   "total": 100
 }
-```
+````
 
 **After (v2)**:
+
 ```json
 {
   "data": [...],
@@ -647,20 +648,22 @@ async def get_api_versions():
 ## Migration Steps
 
 1. **Update headers**:
+
    ```python
    # Before
    headers = {"X-API-Key": "your-key"}
-   
+
    # After  
    headers = {"Authorization": "Bearer your-key"}
    ```
 
 2. **Update response parsing**:
+
    ```python
    # Before
    patterns = response["patterns"]
    total = response["total"]
-   
+
    # After
    patterns = response["data"]
    pagination = response["pagination"]
@@ -668,10 +671,11 @@ async def get_api_versions():
    ```
 
 3. **Update field names**:
+
    ```python
    # Before
    pattern["score"]
-   
+
    # After
    pattern["ranking_score"]
    ```
@@ -679,6 +683,7 @@ async def get_api_versions():
 ## Compatibility Mode
 
 v1 requests with header `Accept-Version: v1.0-compat` will receive v1-style responses:
+
 ```http
 GET /v2/patterns Accept-Version: v1.0-compat
 
@@ -690,7 +695,8 @@ Response:
 ```
 
 **Compat mode available for 6 months after v2 release.**
-```
+
+```text
 
 ---
 
@@ -705,7 +711,7 @@ from fastapi import HTTPException
 
 class VersioningErrors:
     """Standard error responses for versioning issues."""
-    
+
     @staticmethod
     def unsupported_version(supported: List[str]) -> HTTPException:
         """Version not supported."""
@@ -722,7 +728,7 @@ class VersioningErrors:
                 "Accept-Version": "; ".join(supported)
             }
         )
-    
+
     @staticmethod
     def version_deprecated(deprecation: DeprecationInfo) -> HTTPException:
         """Endpoint is deprecated."""
@@ -741,7 +747,7 @@ class VersioningErrors:
                 "Link": f'<{deprecation.migration_guide_url}>; rel="deprecation"; type="text/html"'
             }
         )
-    
+
     @staticmethod
     def version_sunset(deprecation: DeprecationInfo) -> HTTPException:
         """Version has been sunset."""
@@ -770,31 +776,31 @@ from unittest.mock import Mock
 
 class TestAPIVersioning:
     """Test API versioning functionality."""
-    
+
     def test_extract_version_from_path(self):
         """Verify version extraction from URL."""
         negotiator = VersionNegotiator()
-        
+
         assert negotiator.negotiate_version(api_version="v1") == "v1"
         assert negotiator.negotiate_version(api_version="v2") == "v2"
-    
+
     def test_version_negotiation_accept_header(self):
         """Verify Accept-Version header parsing."""
         negotiator = VersionNegotiator()
-        
+
         assert negotiator.negotiate_version(accept_version="v1") == "v1"
         assert negotiator.negotiate_version(accept_version="v1beta") == "v1beta"
-    
+
     def test_default_version(self):
         """Verify default version when none specified."""
         negotiator = VersionNegotiator()
-        
+
         assert negotiator.negotiate_version() == "v1"
-    
+
     def test_deprecation_headers(self):
         """Verify deprecation headers are correct."""
         manager = DeprecationManager(VersionConfig())
-        
+
         deprecation = DeprecationInfo(
             id="dep_001",
             type=DeprecationType.ENDPOINT,
@@ -806,14 +812,14 @@ class TestAPIVersioning:
             replacement="/v1/rank",
             migration_guide_url="https://docs.grimoire.ai/v1/rank-migration"
         )
-        
+
         headers = manager.get_deprecation_headers(deprecation)
-        
+
         assert "Deprecation" in headers
         assert "Sunset" in headers
         assert "Link" in headers
         assert "rel=\"deprecation\"" in headers["Link"]
-    
+
     def test_breaking_change_detection(self):
         """Verify breaking changes are correctly classified."""
         changes = [
@@ -823,7 +829,7 @@ class TestAPIVersioning:
             ("change_type", True),      # Breaking
             ("add_optional_param", False),  # Non-breaking
         ]
-        
+
         for change, expected_break in changes:
             # Test classification logic
             pass
@@ -831,23 +837,23 @@ class TestAPIVersioning:
 
 class TestVersionNegotiation:
     """Test version negotiation scenarios."""
-    
+
     def test_path_version_priority(self):
         """Path version takes precedence over header."""
         negotiator = VersionNegotiator()
-        
+
         result = negotiator.negotiate_version(
             accept_version="v1",
             api_version="v2"
         )
-        
+
         assert result == "v2"
-    
+
     def test_unsupported_version_error(self):
         """Verify error for unsupported version."""
         with pytest.raises(HTTPException) as exc_info:
             raise VersioningErrors.unsupported_version(["v1", "v2"])
-        
+
         assert exc_info.value.status_code == 400
         assert "UnsupportedVersion" in exc_info.value.detail["error"]
 ```
