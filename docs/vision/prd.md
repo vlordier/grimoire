@@ -59,7 +59,7 @@ This is a **procedural intelligence layer**.
 
 ## 4. What the product does (core outcome)
 
-### At the end of this project, the system will:
+### At the end of this project, the system will
 
 1. **Ingest reasoning traces**
 

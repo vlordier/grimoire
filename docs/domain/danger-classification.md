@@ -9,12 +9,14 @@
 ## 0. What this classifier is (and is not)
 
 **It is:**
+
 * Early (runs on first problem statement + first 1–2 turns)
 * Conservative (high recall > high precision)
 * Multi-label (more than one danger can be present)
 * Used to **slow down / change procedure**, not to answer
 
 **It is NOT:**
+
 * A domain classifier
 * A solution selector
 * A confidence estimator
@@ -57,6 +59,7 @@ No tools, no browsing, no long reasoning.
 Catches ~70% cheaply.
 
 **Ambiguity signals:**
+
 * Vague verbs: *improve, better, enhance, optimize, increase, reduce, make, handle, support, enable, ensure*
 * Vague quality adjectives: *scalable, robust, reliable, secure, safe, fast, efficient, user-friendly, production-ready*
 * Missing object patterns: "make it …", "improve it …", "handle this …"
@@ -64,16 +67,19 @@ Catches ~70% cheaply.
 * Conflicting constraints: co-occurrence of *fast/low latency* + *cheap/low cost* + *high accuracy/reliable/safe/secure*
 
 **Adversarial signals:**
+
 * Terms: *adversary, attack, bypass, evade, abuse, fraud, spam, bots, cheat, exploit, poisoning, prompt injection, jailbreak, DDoS, phishing, malware, red team*
 * Trust & safety: *content moderation, trust and safety, T&S*
 * Incentives language: *incentive, gamed/gaming, arms race, cat-and-mouse, adaptive, strategic*
 
 **Irreversibility signals:**
+
 * High-stakes domains: *medical, patient, clinical, diagnosis, treatment, drug, dose, legal, court, lawsuit, compliance, regulatory, safety-critical, aviation, automotive, nuclear, financial advice, credit decision*
 * No-rollback language: *irrevocable, irreversible, cannot undo, no rollback, one-way door, point of no return, permanent*
 * Harm terms: *life, death, harm, injury, liability, fines, penalties, prison, reputational damage*
 
 **Institutional signals:**
+
 * Stakeholder/authority words: *board, committee, leadership, execs, legal team, procurement, union, works council, regulator, auditor, compliance, risk team, security team, stakeholders*
 * Politics/optics: *politics, optics, narrative, buy-in, alignment, approval, sign-off, veto, governance, bureaucracy, public sector*
 * Blocked-by-org phrasing: *they won't, they refuse, not allowed, forbidden, blocked, cannot get approval*
@@ -83,19 +89,23 @@ Catches ~70% cheaply.
 Ask the model **internally** to answer binary probes (not chain-of-thought):
 
 **Ambiguity probes:**
+
 * "Is the success criterion (metric + target + horizon) explicitly defined?"
 * "Is scope clearly defined (in/out)?"
 * "Are constraints clearly listed?"
 
 **Adversarial probes:**
+
 * "Is there an agent that may try to evade, exploit, or adapt to the solution?"
 * "Is this in security, fraud, abuse, moderation, or competitive setting?"
 
 **Irreversibility probes:**
+
 * "Would an error cause serious harm, legal exposure, or be hard to roll back?"
 * "Is a rollback/pilot feasible?"
 
 **Institutional probes:**
+
 * "Are approvals, politics, optics, or governance likely to be the binding constraint?"
 * "Is there a named authority/veto holder involved?"
 
@@ -120,7 +130,7 @@ Use **independent scores** in [0,1] per archetype. Each archetype has its own fo
 
 ### Ambiguity (5 terms)
 
-```
+```text
 ambiguity = clip01(
     0.18 * regex_hits
   + 0.25 * absence          // missing metric tokens AND regex hits > 0
@@ -134,23 +144,24 @@ Note: ambiguity uses **inverted** probe scores (high when probes say "no, not de
 
 ### Adversarial (2 terms)
 
-```
+```text
 adversarial = clip01(0.18 * regex_hits + 0.50 * probe_adaptive_agent)
 ```
 
 ### Irreversibility (2 terms)
 
-```
+```text
 irreversibility = clip01(0.18 * regex_hits + 0.55 * probe_hard_to_rollback)
 ```
 
 ### Institutional (2 terms)
 
-```
+```text
 institutional = clip01(0.18 * regex_hits + 0.55 * probe_power_blocks)
 ```
 
 Where:
+
 * `regex_hits`: count of matched patterns per archetype (cap at 5)
 * `absence` ∈ {0,1}: missing metric tokens when vague verbs present
 * `conflict` ∈ {0,1}: co-occurrence of competing constraints (fast/cheap/safe)
@@ -159,6 +170,7 @@ Where:
 > For the implementation, see [Danger Classification Implementation — `score_dangers()`](../reference/danger-classification-impl.md).
 
 **Thresholds:**
+
 * ≥ 0.30 → *present*
 * ≥ 0.60 → *dominant*
 * ≥ 0.80 → *critical*
@@ -202,13 +214,17 @@ The classifier does **not** choose a solution FSM. It applies **procedural modif
 ## 6. Combined cases
 
 ### Ambiguity + Irreversibility (extremely dangerous)
+
 → Clarify first **and** slow down → No execution until definitions + sign-off
 
 ### Adversarial + Institutional
+
 → Expect policy gaming → Require monitoring + audit trail
 
 ### All four present
+
 → Escalation mode:
+
 * No autonomous execution
 * Decision support only
 * Explicit uncertainty surfaced
@@ -288,6 +304,7 @@ This instinct is made **explicit, programmable, and enforceable**.
 **Input:** "Make our model safer and scalable for production."
 
 **Classifier output:**
+
 * Ambiguity: high (vague + no metrics)
 * Irreversibility: medium (if "safer" triggers)
 * Institutional: low (unless stakeholders mentioned)

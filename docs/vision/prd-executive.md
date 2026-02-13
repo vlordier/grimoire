@@ -4,7 +4,7 @@
 
 ---
 
-### What it is
+## What it is
 
 The Grimoire Meta-Thought Engine is a **procedural intelligence layer** that models how problems are solved—not just what answers are produced. It transforms raw reasoning traces into reusable, auditable **problem-solving procedures** and enforces safe reasoning paths for high-risk situations.
 

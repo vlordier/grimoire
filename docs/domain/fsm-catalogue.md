@@ -24,6 +24,7 @@ All FSMs share this state set for uniform implementation:
 | **S9** | Close | Finalize, confirm, record outcome |
 
 Implementation options:
+
 * A top-level FSM per session/trace
 * Nested sub-FSMs per chunk (windows of steps)
 
@@ -36,12 +37,14 @@ Implementation options:
 **States:** S0 → S1 → S2 → S7 → S9
 
 **Transitions**
+
 * S0→S1 if goal/constraints are vague or conflicting
 * S1→S2 once you have: objective, scope, success metric, constraints, stakeholders
 * S2→S7 when you can choose: archetype + approach + next questions/plan
 * S7→S9 when alignment is confirmed (or "insufficient info, stop")
 
 **Key outputs (graph artifacts)**
+
 * `Goal{definition, metric, horizon}`
 * `Scope{in, out}`
 * `Constraints{hard, soft}`
@@ -60,6 +63,7 @@ Implementation options:
 **States:** S0 → S2 → S3 → S4 → S5 → S6 → (S3 or S8) → S9
 
 **Transitions**
+
 * S0→S2 always (build causal model of failure)
 * S2→S3 create ranked hypotheses
 * S3→S4 run discriminating tests / reproduce / bisect
@@ -83,6 +87,7 @@ Node types: `Symptom`, `Hypothesis`, `Test`, `Evidence`, `RootCause`, `Fix`, `Re
 **States:** S0 → S1 → S2 → S3 → S7 → S8 → S9
 
 **Transitions**
+
 * S1→S2 produce requirements model + constraints map
 * S2→S3 generate options, tradeoff criteria, evaluation plan
 * S3→S7 after evaluating 2–5 viable options
@@ -102,6 +107,7 @@ Node types: `Symptom`, `Hypothesis`, `Test`, `Evidence`, `RootCause`, `Fix`, `Re
 **States:** S0 → S2 → S3 → S4 → S5 → S6 → (S3 or S9)
 
 **Transitions**
+
 * S2 defines metric model + levers
 * S3 picks highest ROI experiment
 * S6→S3 if more headroom
@@ -120,6 +126,7 @@ Node types: `Symptom`, `Hypothesis`, `Test`, `Evidence`, `RootCause`, `Fix`, `Re
 **States:** S0 → S1 → S2 → S3 → S4 → S5 → S6 → S9
 
 **Transitions**
+
 * S1 pin down exact claim + acceptance threshold
 * S2 enumerate assumptions + falsifiers
 * S3 design independent tests/replications
@@ -138,6 +145,7 @@ Node types: `Symptom`, `Hypothesis`, `Test`, `Evidence`, `RootCause`, `Fix`, `Re
 **States:** S0 → S1 → S2 → S3 → S4 → S6 → (S4 or S9)
 
 **Transitions**
+
 * S1 define target format + invariants + oracle tests
 * S2 map source→target constructs
 * S4 do incremental transforms
@@ -156,6 +164,7 @@ Node types: `Symptom`, `Hypothesis`, `Test`, `Evidence`, `RootCause`, `Fix`, `Re
 **States:** S0 → S2 → S3 → S4 → S5 → S6 → S8 → S9
 
 **Transitions**
+
 * S2 identify failure modes + SLO/SLA
 * S3 define monitoring/alerting/runbooks/rollout
 * S4 implement reliability features + deploy staged
@@ -174,6 +183,7 @@ Node types: `Symptom`, `Hypothesis`, `Test`, `Evidence`, `RootCause`, `Fix`, `Re
 **States:** S0 → S2 → S5 → S6 → S8 → S9
 
 **Transitions**
+
 * S2 builds timeline/causal model (backwards)
 * S5 collects evidence
 * S6 separates root causes vs contributing factors
@@ -192,6 +202,7 @@ Node types: `Symptom`, `Hypothesis`, `Test`, `Evidence`, `RootCause`, `Fix`, `Re
 **States:** S0 → S1 → S2 → S3 → S7 → S9
 
 **Transitions**
+
 * S1: enumerate constraints + authority levels
 * S2: prove infeasibility / conflict
 * S3: generate compromise packages + scope/time adjustments
@@ -210,6 +221,7 @@ Node types: `Symptom`, `Hypothesis`, `Test`, `Evidence`, `RootCause`, `Fix`, `Re
 **States:** S0 → S2 → S3 → S4 → S5 → S6 → (S3 or S8) → S9
 
 **Transitions**
+
 * S2 define adversary model + incentives + capabilities
 * S3 design defense-in-depth + detection/response
 * S6 update model based on observed adaptation
@@ -228,6 +240,7 @@ Archetypes 14 (One-way Door Gating) and 15 (Institutional Navigation) are **not 
 ### Modifier A: Institutional Navigation
 
 Add states/edges to any FSM:
+
 * `StakeholderMap`, `VetoPoint`, `Coalition`, `CommsPlan`
 
 Common insertion: between S3 Plan and S7 Decide (and again before S8 Harden)
@@ -235,6 +248,7 @@ Common insertion: between S3 Plan and S7 Decide (and again before S8 Harden)
 ### Modifier B: One-way Door Gating
 
 Add gates to any FSM:
+
 * `IndependentReview`, `Redundancy`, `Pilot`, `Signoff`
 
 Common insertion: before any irreversible transition (usually before S4 Execute or S7 Decide)
@@ -276,6 +290,7 @@ Before committing to any main FSM, on every new problem statement:
 **Condition:** `ambiguity >= 0.60 AND definition_complete == false`
 
 `definition_complete` becomes true when:
+
 * metric/target/horizon defined OR explicitly "no metric, exploratory"
 * scope in/out defined
 * constraints list exists
@@ -287,6 +302,7 @@ Before committing to any main FSM, on every new problem statement:
 **Condition:** `irreversibility >= 0.60 AND verification_passed == false`
 
 `verification_passed` becomes true after:
+
 * FSM-5 Verify completed, OR
 * Explicit independent review recorded
 

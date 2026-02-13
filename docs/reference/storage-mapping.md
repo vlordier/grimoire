@@ -1,6 +1,7 @@
 # Storage Mapping — Neo4j + Qdrant
 
 > 1:1 mapping between the [Canonical Schemas](canonical-schemas.md) and:
+>
 > - **Neo4j** property graph (labels, relationship types, key properties)
 > - **Qdrant** payloads (points, metadata, filtering strategy)
 >
@@ -114,7 +115,7 @@ CREATE INDEX pattern_type IF NOT EXISTS FOR (n:Pattern) ON (n.type);
 
 ### 1.4 Relationship types
 
-```
+```text
 Core structural (between :Step nodes):
   (:Step)-[:NEXT]->(:Step)
   (:Step)-[:SUPPORTS]->(:Step)

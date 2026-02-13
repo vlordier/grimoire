@@ -424,6 +424,7 @@ def annotate_trace(trace_id: str, steps: List[Tuple[str, str]]) -> List[StepAnno
 ### Pipeline integration
 
 During ingestion, after creating `Step` objects:
+
 1. Run `annotate_step(step_id, text)` and store `step.properties["op_tags"]`, `step.properties["primary_op"]` and weak labels for `step.role` / `step.fsm_state`
 2. Run `mine_motifs(trace_id, annotated_steps, n=4, min_support=K)` per trace
 3. Call `attach_signature_to_instances(patterns, instances)` so each instance carries `bindings["_signature"]`
@@ -952,6 +953,7 @@ def embed_and_store_patterns(
 ### Operational note
 
 Vector dimension is fixed per Qdrant collection. Use separate collections for dev vs. prod:
+
 - `patterns_dev_384` — local / fast / cheap
 - `patterns_prod_3072` — cloud / higher quality
 

@@ -92,6 +92,7 @@ Start with heuristics + regex + small "slot-filler" LLM call if needed.
 Create `MENTIONS`, `DEPENDS_ON`, `EVIDENCE_FOR`, `DECISION_FOR`.
 
 **Deliverable:** graph queries like:
+
 * "Show constraints that drove this decision"
 * "Find traces where ambiguity was resolved by metric definition"
 * "Find verification artifacts used before irreversible decisions"
@@ -114,6 +115,7 @@ C) **Semantic clusters**: cluster `step_windows` embeddings → prototypes
 ### 12) Score patterns (success proxies)
 
 Compute per instance:
+
 * Revision loop count
 * Presence of verification
 * Ends cleanly
@@ -178,6 +180,7 @@ Aggregate into `Pattern.quality`.
 ### 17) Versioning
 
 Version:
+
 * Schema
 * Embeddings model
 * Mining pipeline
