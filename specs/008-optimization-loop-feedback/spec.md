@@ -12,6 +12,8 @@
 - [Integration Test Strategy](../../docs/operations/INTEGRATION_TEST_STRATEGY.md) — Testing patterns across all features
 - [Control Flow Specification](../../docs/operations/CONTROL_FLOW_SPECIFICATION.md) — Loop enforcement + convergence
 - [Multi-Tenancy Specification](../../docs/operations/MULTI_TENANCY_SPECIFICATION.md) — Tenant-scoped pattern improvement
+- [Data Export/Import Specification](../../docs/operations/DATA_EXPORT_IMPORT_SPECIFICATION.md) — Pattern library export for sharing
+- [Authentication & Authorization](../../docs/operations/AUTHENTICATION_SPECIFICATION.md) — Security for pattern access
 - **Cross-cutting**: Features 001-007 contribute feedback to this loop
 
 ## Feature Overview

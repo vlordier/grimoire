@@ -19,6 +19,7 @@
 - [Problem Archetypes](../../docs/domain/problem-archetypes.md) — Problem types that traces will encode (context for parser design)
 - [FSM Catalogue](../../docs/domain/fsm-catalogue.md) — FSMs that traces reference via fsm_id (validation requirement)
 - [Integration Test Strategy](../../docs/operations/INTEGRATION_TEST_STRATEGY.md) — Test methodology for all features
+- [Authentication & Authorization](../../docs/operations/AUTHENTICATION_SPECIFICATION.md) — Service-to-service auth for ingestion pipeline
 - **Deferred to Phase 2+:** [MULTI_TENANCY_SPECIFICATION.md](../../docs/operations/MULTI_TENANCY_SPECIFICATION.md), [API_VERSIONING_SPECIFICATION.md](../../docs/operations/API_VERSIONING_SPECIFICATION.md) (relevant for Phase 2 API & multi-tenant rollout)
 
 ## User Scenarios & Testing *(mandatory)*

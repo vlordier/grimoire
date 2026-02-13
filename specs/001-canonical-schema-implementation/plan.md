@@ -19,6 +19,7 @@
 - [Domain: Problem Archetypes](../../docs/domain/problem-archetypes.md) → Shapes traces will have
 - [Domain: Control Pattern Taxonomy](../../docs/domain/control-pattern-taxonomy.md) → Pattern vocabulary (Phase 2 usage)
 - [Integration Test Strategy](../../docs/operations/INTEGRATION_TEST_STRATEGY.md) — Test framework for all 001-008 features
+- [Authentication & Authorization](../../docs/operations/AUTHENTICATION_SPECIFICATION.md) — Service-to-service auth
 - **Phase 2 context:** [MULTI_TENANCY_SPECIFICATION.md](../../docs/operations/MULTI_TENANCY_SPECIFICATION.md), [API_VERSIONING_SPECIFICATION.md](../../docs/operations/API_VERSIONING_SPECIFICATION.md), [CONTROL_FLOW_SPECIFICATION.md](../../docs/operations/CONTROL_FLOW_SPECIFICATION.md)
 
 ## Summary
