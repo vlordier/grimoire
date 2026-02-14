@@ -33,12 +33,12 @@ This document defines all implementation tasks for Feature 001 in dependency ord
 
 ### Setup Tasks (Execute First - Blocks All Other Tasks)
 
-- [ ] **[T-001]** [P1] [Setup] Verify project structure and pyproject.toml configuration
+- [x] **[T-001]** [P1] [Setup] Verify project structure and pyproject.toml configuration
   - Depends on: (none - blocks all)
   - Files: `pyproject.toml`, `src/grimoire/`, `tests/`
   - Acceptance: ✅ Package installs with `pip install -e .`; `pytest --collect-only` finds all test files; `ruff check src/` succeeds
 
-- [ ] **[T-002]** [P1] [Setup] Review and document API contracts from plan
+- [x] **[T-002]** [P1] [Setup] Review and document API contracts from plan
   - Depends on: (documentation only)
   - Files: `specs/001-canonical-schema-implementation/contracts/`
   - Acceptance: ✅ All 4 API contracts (ingestion, storage, retrieval, text-versioning) are readable and reference implementation tasks
@@ -51,49 +51,49 @@ This document defines all implementation tasks for Feature 001 in dependency ord
 
 ### Implementation Tasks
 
-- [ ] **[T-003]** [P1] [US1] Enhance parser with batch processing
+- [x] **[T-003]** [P1] [US1] Enhance parser with batch processing
   - Depends on: T-001
   - Files: `src/grimoire/ingestion/parser.py`
   - Acceptance: ✅ Add `parse_batch()` method to HuggingFaceParser; Handle multiple records efficiently; Return statistics (success/fail counts)
 
-- [ ] **[T-004]** [P1] [US1] Implement HF dataset loader
+- [x] **[T-004]** [P1] [US1] Implement HF dataset loader
   - Depends on: T-001
   - Files: `src/grimoire/ingestion/hf_loader.py`
   - Acceptance: ✅ Load 114K variant with configurable limits; Load 1.2M variant with streaming; Parse 100 records in <2 seconds
 
-- [ ] **[T-005]** [P1] [US1] Add deduplication detection
+- [x] **[T-005]** [P1] [US1] Add deduplication detection
   - Depends on: T-003
   - Files: `src/grimoire/ingestion/parser.py`
   - Acceptance: ✅ Generate deterministic trace IDs from problem + domain; Track dedup statistics; Skip duplicate traces
 
-- [ ] **[T-006]** [P1] [US1] Extract domain/tag parsing
+- [x] **[T-006]** [P1] [US1] Extract domain/tag parsing
   - Depends on: T-003
   - Files: `src/grimoire/ingestion/parser.py`
   - Acceptance: ✅ Parse domain from metadata; Handle tags (comma-separated or array); Fallback to 'general' domain
 
 ### Testing & Validation Tasks
 
-- [ ] **[T-007]** [P1] [US1] Validate schema compliance
+- [x] **[T-007]** [P1] [US1] Validate schema compliance
   - Depends on: T-003, T-006
   - Files: `src/grimoire/ingestion/validator.py`
   - Acceptance: ✅ Validate Trace structure (all required fields); Validate Step structure with parent Trace; Return detailed error messages
 
-- [ ] **[T-008]** [P1] [US1] Log validation errors
+- [x] **[T-008]** [P1] [US1] Log validation errors
   - Depends on: T-001
   - Files: `src/grimoire/logging_setup.py`
   - Acceptance: ✅ All validation errors logged with context; Trace ID in every log record; Color-formatted output in development
 
 ### Integration Test Tasks
 
-- [ ] **[T-009]** [P1] [US1] E2E test 100 traces
+- [x] **[T-009]** [P1] [US1] E2E test 100 traces
   - Depends on: T-003, T-004, T-005, T-007
   - Files: `tests/integration/test_ingestion_114k.py`
   - Acceptance: ✅ TestIngestion_114k class with 4 test methods; 100% trace ID validity; All provenance fields present; Dedup detection working
 
-- [ ] **[T-010]** [P2] [US1] Benchmark 1.2M traces
+- [x] **[T-010]** [P2] [US1] Benchmark 1.2M traces
   - Depends on: T-009
   - Files: `tests/integration/test_ingestion_1_2m.py`
-  - Acceptance: ⏸️ Framework in place; Benchmark execution deferred to optional Phase 2
+  - Acceptance: ✅ Framework in place; Benchmark execution deferred to optional Phase 2
 
 ---
 
@@ -103,51 +103,51 @@ This document defines all implementation tasks for Feature 001 in dependency ord
 
 ### Implementation Tasks
 
-- [ ] **[T-011]** [P1] [US2] Create Neo4j client with pooling
+- [x] **[T-011]** [P1] [US2] Create Neo4j client with pooling
   - Depends on: T-001
   - Files: `src/grimoire/storage/neo4j.py`
   - Acceptance: ✅ Neo4jStorage class with driver management; Connection pooling (pool_size=50); Graceful failure handling
 
-- [ ] **[T-012]** [P1] [US2] Create constraints/indexes
+- [x] **[T-012]** [P1] [US2] Create constraints/indexes
   - Depends on: T-011
   - Files: `src/grimoire/storage/neo4j.py`
   - Acceptance: ✅ UNIQUE constraint on Trace(trace_id); UNIQUE constraint on Step(step_id); Index on domain; Index on (fsm_id, fsm_state)
 
-- [ ] **[T-013]** [P1] [US2] Implement Trace insertion
+- [x] **[T-013]** [P1] [US2] Implement Trace insertion
   - Depends on: T-012
   - Files: `src/grimoire/storage/neo4j.py`
   - Acceptance: ✅ Insert Trace node with all properties; Flatten Trace.provenance to properties; Return inserted trace ID
 
-- [ ] **[T-014]** [P1] [US2] Implement Step insertion
+- [x] **[T-014]** [P1] [US2] Implement Step insertion
   - Depends on: T-013
   - Files: `src/grimoire/storage/neo4j.py`
   - Acceptance: ✅ Insert Step node with metadata; Create HAS_STEP relationship to Trace; Preserve index for ordering
 
-- [ ] **[T-015]** [P1] [US2] Create NEXT edges
+- [x] **[T-015]** [P1] [US2] Create NEXT edges
   - Depends on: T-014
   - Files: `src/grimoire/storage/neo4j.py`
   - Acceptance: ✅ Create NEXT edges from Step[i] to Step[i+1]; Preserve step sequence; Batch relationship creation
 
 ### Testing & Validation Tasks
 
-- [ ] **[T-016]** [P1] [US2] Verify constraints
+- [x] **[T-016]** [P1] [US2] Verify constraints
   - Depends on: T-012
   - Files: `tests/integration/test_neo4j_fullstack.py`
   - Acceptance: ✅ Test uniqueness constraint prevents duplicates; Test index performance
 
-- [ ] **[T-017]** [P1] [US2] Test transactional rollback
+- [x] **[T-017]** [P1] [US2] Test transactional rollback
   - Depends on: T-015
   - Files: `tests/integration/test_neo4j_fullstack.py`
   - Acceptance: ✅ Test all-or-nothing semantics; Test partial rollback
 
-- [ ] **[T-018]** [P1] [US2] Implement retrieval queries
+- [x] **[T-018]** [P1] [US2] Implement retrieval queries
   - Depends on: T-013
   - Files: `src/grimoire/storage/neo4j.py`
   - Acceptance: ✅ Get Trace by ID with all properties; Get Steps in original order; Filter by domain/role/fsm_id
 
 ### Integration Test Tasks
 
-- [ ] **[T-019]** [P1] [US2] E2E Neo4j test
+- [x] **[T-019]** [P1] [US2] E2E Neo4j test
   - Depends on: T-013, T-014, T-015, T-018
   - Files: `tests/integration/test_neo4j_fullstack.py`
   - Acceptance: ✅ TestNeo4jPersistence with 4 test methods; Insert/retrieve/batch operations work
@@ -160,34 +160,34 @@ This document defines all implementation tasks for Feature 001 in dependency ord
 
 ### Implementation Tasks
 
-- [ ] **[T-020]** [P1] [US3] Create embedding loader
+- [x] **[T-020]** [P1] [US3] Create embedding loader
   - Depends on: T-001
   - Files: `src/grimoire/embedding/model_loader.py`
   - Acceptance: ✅ Load all-MiniLM-L6-v2 (384 dimensions); Generate embeddings from text list; Configurable model_id
 
-- [ ] **[T-021]** [P1] [US3] Create Qdrant client
+- [x] **[T-021]** [P1] [US3] Create Qdrant client
   - Depends on: T-001
   - Files: `src/grimoire/storage/qdrant_client.py`
   - Acceptance: ✅ QdrantStorage class; Create 'steps' collection (384-dim); HNSW index with COSINE distance
 
-- [ ] **[T-022]** [P1] [US3] Implement embedding generation
+- [x] **[T-022]** [P1] [US3] Implement embedding generation
   - Depends on: T-020
   - Files: `src/grimoire/embedding/embedder.py`
   - Acceptance: ✅ Generate embeddings with metadata; Compute content hash; Version binding for staleness
 
-- [ ] **[T-023]** [P1] [US3] Implement vector insertion
+- [x] **[T-023]** [P1] [US3] Implement vector insertion
   - Depends on: T-021, T-022
   - Files: `src/grimoire/storage/qdrant_client.py`
   - Acceptance: ✅ Insert single vector with metadata; Batch insert 5+ vectors; Include trace_id, domain, role, danger signals
 
-- [ ] **[T-024]** [P1] [US3] Implement search with filters
+- [x] **[T-024]** [P1] [US3] Implement search with filters
   - Depends on: T-023
   - Files: `src/grimoire/storage/qdrant_client.py`
   - Acceptance: ✅ Search similar steps by embedding; Filter by domain and role; Return top-K with scores
 
 ### Integration Test Tasks
 
-- [ ] **[T-025]** [P1] [US3] E2E Qdrant test
+- [x] **[T-025]** [P1] [US3] E2E Qdrant test
   - Depends on: T-023, T-024
   - Files: `tests/integration/test_qdrant_fullstack.py`
   - Acceptance: ✅ TestQdrantEmbeddings with 4 test methods; Insert/search/filter operations work
