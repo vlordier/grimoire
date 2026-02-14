@@ -120,6 +120,7 @@
 ---
 
 **Notes**:
+
 - This checklist validates REQUIREMENT QUALITY, not implementation correctness
 - Each item is a "unit test" for the English-language specifications
 - Mark items as checked when the requirement quality is validated
